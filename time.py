@@ -310,9 +310,16 @@ class TimeCheckAutomation:
                 self.driver.quit()
                 logger.info("Browser session closed")
 
-    def run_clock_action(self, action='switch'):
+    def run_clock_action(self, action='switch', random_delay=None):
         """Run clock in/out action"""
         try:
+            if random_delay:
+                min_delay, max_delay = random_delay
+                delay = random.uniform(min_delay * 60, max_delay * 60)  # Convert to seconds
+                delay_min = delay / 60
+                logger.info(f"Random delay activated: waiting {delay_min:.2f} minutes...")
+                time.sleep(delay)
+                
             self.setup_driver()
             self.login()
             self.handle_time_tracking(action)
@@ -328,9 +335,11 @@ class TimeCheckAutomation:
                 logger.info("Browser session closed")
 
 if __name__ == "__main__":
+    import sys
     import json
     import argparse
-    import sys
+    import random
+    import time
     
     parser = argparse.ArgumentParser(description='Time tracking automation')
     parser.add_argument('action', nargs='?', choices=['in', 'out', 'switch', 'status'], 
@@ -340,7 +349,9 @@ if __name__ == "__main__":
     parser.add_argument('-q', '--quiet', action='store_true',
                        help='Disable ntfy notifications')
     parser.add_argument('-v', '--verbose', action='count', default=0,
-                       help='Increase verbosity (can be used twice: -v or -vv)')
+                       help='Increase verbosity (can be used up to three times: -v, -vv, or -vvv)')
+    parser.add_argument('-r', '--random-delay', type=float, nargs=2, metavar=('MIN', 'MAX'),
+                       help='Random delay between MIN and MAX minutes before action')
     
     args = parser.parse_args()
     
@@ -348,11 +359,18 @@ if __name__ == "__main__":
     setup_logging(args.verbose)
     
     try:
+        # Handle random delay if specified
+        if args.random_delay:
+            min_delay, max_delay = args.random_delay
+            delay_secs = random.uniform(min_delay * 60, max_delay * 60)
+            if not args.quiet:
+                print(f"Waiting {delay_secs/60:.2f} minutes...", file=sys.stderr)
+            time.sleep(delay_secs)
+
         automation = TimeCheckAutomation(quiet=args.quiet)
         
         if args.action == 'status':
             time_info = automation.run()
-            # Send only the JSON to stdout
             print(json.dumps(time_info, indent=2), file=sys.stdout)
         else:
             automation.run_clock_action(args.action)

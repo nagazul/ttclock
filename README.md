@@ -47,7 +47,9 @@ uv run python time.py status -q | jq  # Check status explicitly (!ntfy)
 uv run python time.py in              # Force clock-in
 uv run python time.py out             # Force clock-out
 uv run python time.py switch          # Switch in/out
-uv run python time.py -q              # any command with notifications disabled
+uv run python time.py -q              # Any command with notifications disabled
+
+uv run python time.py switch -r 1 5   # Random delay between 1-5 minutes before switch
 
 # Verbosity levels (can be combined with any command):
 uv run python time.py -v              # Basic operational messages
