@@ -28,12 +28,15 @@ class TimeTrackingAutomation:
         self.url = os.getenv('TIMETRACKING_URL')
         self.username = os.getenv('TIMETRACKING_USERNAME')
         self.password = os.getenv('TIMETRACKING_PASSWORD')
-        self.ntfy_topic = os.getenv('NTFY_TOPIC', 'ttclock')
+        self.ntfy_topic = os.getenv('NTFY_TOPIC', '')  # Default to empty string
         self.driver = None
         self.wait = None
 
     def send_notification(self, message, priority='default', tags=None):
-        """Send notification to ntfy.sh"""
+        """Send notification to ntfy.sh if topic is configured"""
+        if not self.ntfy_topic:
+            return
+            
         try:
             current_time = datetime.now().strftime('%H:%M:%S')
             data = f"[{current_time}] {message}"
