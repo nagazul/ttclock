@@ -49,10 +49,13 @@ uv run python time.py out             # Force clock-out
 uv run python time.py switch          # Switch in/out
 uv run python time.py -q              # any command with notifications disabled
 
-Verbosity levels (can be combined with any command):
+# Verbosity levels (can be combined with any command):
 uv run python time.py -v              # Basic operational messages
 uv run python time.py -vv             # Detailed operation messages
 uv run python time.py -vvv            # Full debug output
+
+# Get the time clocked today
+uv run python time.py -q | jq -r '.time_worked'
 ```
 
 ## Notes
