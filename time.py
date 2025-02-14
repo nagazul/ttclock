@@ -1,5 +1,4 @@
 import os
-import requests
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.action_chains import ActionChains
@@ -11,6 +10,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.chrome.service import Service
 import logging
 from dotenv import load_dotenv
+import requests
 from datetime import datetime
 
 # Configure logging
@@ -23,12 +23,12 @@ logger = logging.getLogger(__name__)
 # Load environment variables
 load_dotenv()
 
-class TimeTrackingAutomation:
-    def __init__(self):
+class TimeCheckAutomation:
+    def __init__(self, quiet=False):
         self.url = os.getenv('TIMETRACKING_URL')
         self.username = os.getenv('TIMETRACKING_USERNAME')
         self.password = os.getenv('TIMETRACKING_PASSWORD')
-        self.ntfy_topic = os.getenv('NTFY_TOPIC', '')  # Default to empty string
+        self.ntfy_topic = '' if quiet else os.getenv('NTFY_TOPIC', '')
         self.driver = None
         self.wait = None
 
@@ -42,7 +42,7 @@ class TimeTrackingAutomation:
             data = f"[{current_time}] {message}"
             headers = {
                 "Priority": priority,
-                "Tags": ','.join(tags) if tags else "clock"
+                "Tags": ','.join(tags) if tags else "time"
             }
             
             response = requests.post(
@@ -61,10 +61,10 @@ class TimeTrackingAutomation:
         chrome_options.add_argument("--disable-infobars")
         chrome_options.add_argument("--start-maximized")
         chrome_options.add_argument("--incognito")
-        chrome_options.add_argument("--headless=new")  # Modern headless mode
-        chrome_options.add_argument("--disable-gpu")   # Recommended for headless
-        chrome_options.add_argument("--no-sandbox")    # Required for some Linux systems
-        chrome_options.add_argument("--disable-dev-shm-usage")  # Prevent memory issues
+        chrome_options.add_argument("--headless=new")
+        chrome_options.add_argument("--disable-gpu")
+        chrome_options.add_argument("--no-sandbox")
+        chrome_options.add_argument("--disable-dev-shm-usage")
         
         # Check common Chrome binary locations
         chrome_paths = [
@@ -86,14 +86,10 @@ class TimeTrackingAutomation:
         else:
             logger.warning("Could not find Chrome binary in common locations")
         
-        # Optional headless mode
-        if os.getenv('HEADLESS_MODE', 'false').lower() == 'true':
-            chrome_options.add_argument('--headless')
-
         service = Service(ChromeDriverManager().install())
         self.driver = webdriver.Chrome(service=service, options=chrome_options)
         self.driver.set_window_size(1920, 1080)
-        self.wait = WebDriverWait(self.driver, 30)  # Reduced wait time from 200
+        self.wait = WebDriverWait(self.driver, 30)
 
     def login(self):
         """Handle the login process"""
@@ -113,13 +109,80 @@ class TimeTrackingAutomation:
 
             # Handle "Stay signed in" prompt
             self.wait.until(EC.element_to_be_clickable((By.ID, 'idSIButton9'))).click()
-            logger.info("Login successful")
+            
+            # Wait for the app to fully load
+            self.wait.until(EC.presence_of_element_located((By.TAG_NAME, 'app-root')))
+            self.wait.until(EC.presence_of_element_located((By.TAG_NAME, 'app-clock')))
+            
+            logger.info("Login successful and app loaded")
 
         except TimeoutException as e:
             logger.error(f"Timeout during login process: {str(e)}")
             raise
         except WebDriverException as e:
             logger.error(f"WebDriver error during login: {str(e)}")
+            raise
+
+    def get_time_info(self):
+        """Get the time information from the page"""
+        try:
+            logger.info("Looking for time information...")
+            
+            # Get all rows with time data
+            rows = self.wait.until(
+                EC.presence_of_all_elements_located((By.CSS_SELECTOR, "table.clocking-info tr"))
+            )
+            
+            times = {}
+            # Extract information from each row
+            for row in rows:
+                label = row.find_element(By.CLASS_NAME, "td-cell").text.strip()
+                value = row.find_element(By.CLASS_NAME, "td-data").text.strip()
+                
+                # Convert date format if this is the date field
+                if label == "Current Date":
+                    # Convert from DD/MM/YYYY to YYYY-MM-DD
+                    day, month, year = value.split('/')
+                    value = f"{year}-{month}-{day}"
+                
+                times[label] = value
+            
+            # Get clock status
+            clock_buttons = self.wait.until(
+                EC.presence_of_all_elements_located((By.CSS_SELECTOR, "app-clock button"))
+            )
+            
+            if len(clock_buttons) < 2:
+                raise ValueError("Could not find clock buttons")
+
+            clock_in_button = clock_buttons[0]
+            is_clocked_in = clock_in_button.get_attribute("disabled") is not None
+            status = "Clocked In" if is_clocked_in else "Clocked Out"
+            
+            # Prepare message with all information
+            message = (
+                f"Status: {status}\n"
+                f"First clock in: {times.get('First clock in', 'N/A')}\n"
+                f"Time worked: {times.get('All for today', 'N/A')}\n"
+                f"Time left: {times.get('Time left', 'N/A')}\n"
+                f"Date: {times.get('Current Date', 'N/A')}"
+            )
+            
+            logger.info(message)
+            self.send_notification(message, tags=["time", "check"])
+            
+            return {
+                'status': status,
+                'first_clock': times.get('First clock in'),
+                'time_worked': times.get('All for today'),
+                'time_left': times.get('Time left'),
+                'date': times.get('Current Date')
+            }
+
+        except Exception as e:
+            error_msg = f"Error getting time info: {str(e)}"
+            logger.error(error_msg)
+            self.send_notification(error_msg, priority="high", tags=["time", "error"])
             raise
 
     def handle_time_tracking(self, action='switch'):
@@ -139,7 +202,7 @@ class TimeTrackingAutomation:
             clock_out_button = clock_buttons[1]
 
             # Check current state
-            is_clocked_in = clock_in_button.get_attribute("disabled")
+            is_clocked_in = clock_in_button.get_attribute("disabled") is not None
             
             # Determine action based on input and current state
             should_clock_in = {
@@ -172,15 +235,30 @@ class TimeTrackingAutomation:
                 self.send_notification(msg, tags=["clock", "out"])
                 ActionChains(self.driver).move_to_element(clock_out_button).click().perform()
 
-        except TimeoutException as e:
-            logger.error(f"Timeout while handling time tracking: {str(e)}")
-            raise
-        except WebDriverException as e:
-            logger.error(f"WebDriver error during time tracking: {str(e)}")
+        except Exception as e:
+            error_msg = f"Error handling time tracking: {str(e)}"
+            logger.error(error_msg)
+            self.send_notification(error_msg, priority="high", tags=["clock", "error"])
             raise
 
-    def run(self, action='switch'):
-        """Main execution method"""
+    def run(self):
+        """Run status check"""
+        try:
+            self.setup_driver()
+            self.login()
+            return self.get_time_info()
+        except Exception as e:
+            error_msg = f"An error occurred: {str(e)}"
+            logger.error(error_msg)
+            self.send_notification(error_msg, priority="high", tags=["time", "error"])
+            raise
+        finally:
+            if self.driver:
+                self.driver.quit()
+                logger.info("Browser session closed")
+
+    def run_clock_action(self, action='switch'):
+        """Run clock in/out action"""
         try:
             self.setup_driver()
             self.login()
@@ -197,18 +275,27 @@ class TimeTrackingAutomation:
                 logger.info("Browser session closed")
 
 if __name__ == "__main__":
+    import json
     import argparse
     
     parser = argparse.ArgumentParser(description='Time tracking automation')
-    parser.add_argument('action', nargs='?', choices=['in', 'out', 'switch'], 
-                       default='switch',
-                       help='Specify action: "in" to clock in, "out" to clock out, "switch" to toggle (default)')
+    parser.add_argument('action', nargs='?', choices=['in', 'out', 'switch', 'status'], 
+                       default='status',
+                       help='Specify action: "in" to clock in, "out" to clock out, '
+                            '"switch" to toggle, "status" to check (default)')
+    parser.add_argument('-q', '--quiet', action='store_true',
+                       help='Disable ntfy notifications')
     
     args = parser.parse_args()
     
     try:
-        automation = TimeTrackingAutomation()
-        automation.run(action=args.action)
+        automation = TimeCheckAutomation(quiet=args.quiet)
+        
+        if args.action == 'status':
+            time_info = automation.run()
+            print(json.dumps(time_info, indent=2))
+        else:
+            automation.run_clock_action(args.action)
     except Exception as e:
         logger.error(f"Script failed: {str(e)}")
         exit(1)
