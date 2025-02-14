@@ -14,10 +14,38 @@ import requests
 from datetime import datetime
 
 # Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
+def setup_logging(verbosity=0):
+    # Configure root logger to stderr
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.ERROR)  # Default to ERROR for root logger
+    handler = logging.StreamHandler(sys.stderr)
+    handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+    root_logger.addHandler(handler)
+    
+    # Configure our script's logger
+    script_logger = logging.getLogger(__name__)
+    
+    if verbosity == 0:  # Silent mode
+        script_logger.setLevel(logging.ERROR)
+        logging.getLogger('selenium').setLevel(logging.ERROR)
+        logging.getLogger('urllib3').setLevel(logging.ERROR)
+        logging.getLogger('WDM').setLevel(logging.ERROR)
+    elif verbosity == 1:  # -v: Basic script messages
+        script_logger.setLevel(logging.INFO)
+        logging.getLogger('selenium').setLevel(logging.ERROR)
+        logging.getLogger('urllib3').setLevel(logging.ERROR)
+        logging.getLogger('WDM').setLevel(logging.ERROR)
+    elif verbosity == 2:  # -vv: More detailed messages
+        script_logger.setLevel(logging.DEBUG)
+        logging.getLogger('selenium').setLevel(logging.WARNING)
+        logging.getLogger('urllib3').setLevel(logging.WARNING)
+        logging.getLogger('WDM').setLevel(logging.INFO)
+    else:  # -vvv: All debug messages
+        script_logger.setLevel(logging.DEBUG)
+        logging.getLogger('selenium').setLevel(logging.DEBUG)
+        logging.getLogger('urllib3').setLevel(logging.DEBUG)
+        logging.getLogger('WDM').setLevel(logging.DEBUG)
+
 logger = logging.getLogger(__name__)
 
 # Load environment variables
@@ -57,6 +85,7 @@ class TimeCheckAutomation:
 
     def setup_driver(self):
         """Configure and initialize the Chrome WebDriver"""
+        logger.debug("Setting up Chrome options...")
         chrome_options = Options()
         chrome_options.add_argument("--disable-infobars")
         chrome_options.add_argument("--start-maximized")
@@ -66,6 +95,7 @@ class TimeCheckAutomation:
         chrome_options.add_argument("--no-sandbox")
         chrome_options.add_argument("--disable-dev-shm-usage")
         
+        logger.debug("Checking for Chrome binary locations...")
         # Check common Chrome binary locations
         chrome_paths = [
             '/usr/bin/google-chrome',
@@ -76,6 +106,7 @@ class TimeCheckAutomation:
         
         chrome_binary = None
         for path in chrome_paths:
+            logger.debug(f"Checking path: {path}")
             if os.path.exists(path):
                 chrome_binary = path
                 break
@@ -86,9 +117,13 @@ class TimeCheckAutomation:
         else:
             logger.warning("Could not find Chrome binary in common locations")
         
+        logger.debug("Setting up ChromeDriver service...")
         service = Service(ChromeDriverManager().install())
+        
+        logger.debug("Initializing Chrome WebDriver...")
         self.driver = webdriver.Chrome(service=service, options=chrome_options)
         self.driver.set_window_size(1920, 1080)
+        logger.debug("Setting up WebDriverWait with 30 second timeout...")
         self.wait = WebDriverWait(self.driver, 30)
 
     def login(self):
@@ -96,28 +131,46 @@ class TimeCheckAutomation:
         try:
             logger.info("Navigating to login page...")
             self.driver.get(self.url)
+            logger.debug(f"Current URL: {self.driver.current_url}")
 
-            # Enter username
+            logger.debug("Waiting for username field...")
             username_field = self.wait.until(EC.presence_of_element_located((By.NAME, 'loginfmt')))
+            logger.debug("Entering username...")
             username_field.send_keys(self.username)
-            self.wait.until(EC.element_to_be_clickable((By.ID, 'idSIButton9'))).click()
+            
+            logger.debug("Waiting for next button...")
+            next_button = self.wait.until(EC.element_to_be_clickable((By.ID, 'idSIButton9')))
+            logger.debug("Clicking next button...")
+            next_button.click()
 
-            # Enter password
+            logger.debug("Waiting for password field...")
             password_field = self.wait.until(EC.presence_of_element_located((By.ID, 'passwordInput')))
+            logger.debug("Entering password...")
             password_field.send_keys(self.password)
-            self.wait.until(EC.element_to_be_clickable((By.ID, 'submitButton'))).click()
+            
+            logger.debug("Waiting for submit button...")
+            submit_button = self.wait.until(EC.element_to_be_clickable((By.ID, 'submitButton')))
+            logger.debug("Clicking submit button...")
+            submit_button.click()
 
-            # Handle "Stay signed in" prompt
-            self.wait.until(EC.element_to_be_clickable((By.ID, 'idSIButton9'))).click()
+            logger.debug("Waiting for 'Stay signed in' prompt...")
+            stay_signed_in = self.wait.until(EC.element_to_be_clickable((By.ID, 'idSIButton9')))
+            logger.debug("Handling 'Stay signed in' prompt...")
+            stay_signed_in.click()
             
             # Wait for the app to fully load
+            logger.debug("Waiting for app-root element...")
             self.wait.until(EC.presence_of_element_located((By.TAG_NAME, 'app-root')))
+            logger.debug("Waiting for app-clock element...")
             self.wait.until(EC.presence_of_element_located((By.TAG_NAME, 'app-clock')))
             
             logger.info("Login successful and app loaded")
+            logger.debug(f"Final URL after login: {self.driver.current_url}")
 
         except TimeoutException as e:
             logger.error(f"Timeout during login process: {str(e)}")
+            logger.debug(f"Current URL at timeout: {self.driver.current_url}")
+            logger.debug(f"Page source at timeout: {self.driver.page_source[:500]}...")
             raise
         except WebDriverException as e:
             logger.error(f"WebDriver error during login: {str(e)}")
@@ -277,6 +330,7 @@ class TimeCheckAutomation:
 if __name__ == "__main__":
     import json
     import argparse
+    import sys
     
     parser = argparse.ArgumentParser(description='Time tracking automation')
     parser.add_argument('action', nargs='?', choices=['in', 'out', 'switch', 'status'], 
@@ -285,15 +339,21 @@ if __name__ == "__main__":
                             '"switch" to toggle, "status" to check (default)')
     parser.add_argument('-q', '--quiet', action='store_true',
                        help='Disable ntfy notifications')
+    parser.add_argument('-v', '--verbose', action='count', default=0,
+                       help='Increase verbosity (can be used twice: -v or -vv)')
     
     args = parser.parse_args()
+    
+    # Setup logging based on verbosity level
+    setup_logging(args.verbose)
     
     try:
         automation = TimeCheckAutomation(quiet=args.quiet)
         
         if args.action == 'status':
             time_info = automation.run()
-            print(json.dumps(time_info, indent=2))
+            # Send only the JSON to stdout
+            print(json.dumps(time_info, indent=2), file=sys.stdout)
         else:
             automation.run_clock_action(args.action)
     except Exception as e:
