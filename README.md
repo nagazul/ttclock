@@ -46,6 +46,7 @@ uv run python time.py                 # Default action is 'status'
 uv run python time.py status -q | jq  # Check status explicitly (!ntfy)
 uv run python time.py in              # Force clock-in
 uv run python time.py out             # Force clock-out
+uv run python time.py auto-out        # Clock-out only if time_left if 00:00:00 
 uv run python time.py switch          # Switch in/out
 uv run python time.py -q              # Any command with notifications disabled
 

@@ -342,10 +342,9 @@ if __name__ == "__main__":
     import time
     
     parser = argparse.ArgumentParser(description='Time tracking automation')
-    parser.add_argument('action', nargs='?', choices=['in', 'out', 'switch', 'status'], 
+    parser.add_argument('action', nargs='?', choices=['in', 'out', 'switch', 'status', 'auto-out'],
                        default='status',
-                       help='Specify action: "in" to clock in, "out" to clock out, '
-                            '"switch" to toggle, "status" to check (default)')
+                       help='Specify action: "in" to clock in, "out" to clock out, "switch" to toggle, "status" to check (default), "auto-out" for auto clock-out')
     parser.add_argument('-q', '--quiet', action='store_true',
                        help='Disable ntfy notifications')
     parser.add_argument('-v', '--verbose', action='count', default=0,
@@ -372,6 +371,13 @@ if __name__ == "__main__":
         if args.action == 'status':
             time_info = automation.run()
             print(json.dumps(time_info, indent=2), file=sys.stdout)
+        elif args.action == 'auto-out':
+            time_info = automation.run()
+            if time_info.get('time_left') == "00:00:00" and time_info.get('status') != "Clocked Out":
+                automation.run_clock_action("out")
+            else:
+                logger.info("No action needed.")
+                print("No action needed.", file=sys.stdout)
         else:
             automation.run_clock_action(args.action)
     except Exception as e:
