@@ -48,6 +48,11 @@ uv run python time.py in              # Force clock-in
 uv run python time.py out             # Force clock-out
 uv run python time.py switch          # Switch in/out
 uv run python time.py -q              # any command with notifications disabled
+
+Verbosity levels (can be combined with any command):
+uv run python time.py -v              # Basic operational messages
+uv run python time.py -vv             # Detailed operation messages
+uv run python time.py -vvv            # Full debug output
 ```
 
 ## Notes
