@@ -1,68 +1,146 @@
-from selenium import webdriveZZZZZZZselenium.webdriver.chrome.options import Options  # Correct options for Chrome
+import os
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import TimeoutException, WebDriverException
+from webdriver_manager.chrome import ChromeDriverManager
+from selenium.webdriver.chrome.service import Service
+import logging
+from dotenv import load_dotenv
 
-# Define the URL and user-agent
-url = 'https://rotimetracking.emeal.XXXXXXX.com:4431/time/clockin'
-user_agent = 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/117.0'
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
-# Create an Options object and configure it for Chrome
-chrome_options = Options()
-chrome_options.add_argument(f"user-agent={user_agent}")  # Set the user-agent
-chrome_options.add_argument("--disable-infobars")  # Disable the automation message
-chrome_options.add_argument("--start-maximized")  # Start Chrome maximized
-chrome_options.add_argument("--incognito")  # Start in incognito mode
-# chrome_options.add_argument('--headless')  # Uncomment this line if you want to run in headless mode
+# Load environment variables
+load_dotenv()
 
-driver = webdriver.Chrome(options=chrome_options)
+class TimeTrackingAutomation:
+    def __init__(self):
+        self.url = os.getenv('TIMETRACKING_URL')
+        self.username = os.getenv('TIMETRACKING_USERNAME')
+        self.password = os.getenv('TIMETRACKING_PASSWORD')
+        self.driver = None
+        self.wait = None
 
-try:
-    driver.set_window_size(1920, 1080)
+    def setup_driver(self):
+        """Configure and initialize the Chrome WebDriver"""
+        chrome_options = Options()
+        chrome_options.add_argument("--disable-infobars")
+        chrome_options.add_argument("--start-maximized")
+        chrome_options.add_argument("--incognito")
+        
+        # Check common Chrome binary locations
+        chrome_paths = [
+            '/usr/bin/google-chrome',
+            '/usr/bin/google-chrome-stable',
+            '/usr/bin/chromium',
+            '/usr/bin/chromium-browser'
+        ]
+        
+        chrome_binary = None
+        for path in chrome_paths:
+            if os.path.exists(path):
+                chrome_binary = path
+                break
+                
+        if chrome_binary:
+            chrome_options.binary_location = chrome_binary
+            logger.info(f"Using Chrome binary at: {chrome_binary}")
+        else:
+            logger.warning("Could not find Chrome binary in common locations")
+        
+        # Optional headless mode
+        if os.getenv('HEADLESS_MODE', 'false').lower() == 'true':
+            chrome_options.add_argument('--headless')
 
-    print("Opening URL...")
-    driver.get(url)
+        service = Service(ChromeDriverManager().install())
+        self.driver = webdriver.Chrome(service=service, options=chrome_options)
+        self.driver.set_window_size(1920, 1080)
+        self.wait = WebDriverWait(self.driver, 30)  # Reduced wait time from 200
 
-    wait = WebDriverWait(driver, 200)
-    username = wait.until(EC.presence_of_element_located((By.NAME, 'loginfmt')))
+    def login(self):
+        """Handle the login process"""
+        try:
+            logger.info("Navigating to login page...")
+            self.driver.get(self.url)
 
-    print("Entering username...")
-    username.send_keys('XXX@emeal.XXXXXXX.com')
+            # Enter username
+            username_field = self.wait.until(EC.presence_of_element_located((By.NAME, 'loginfmt')))
+            username_field.send_keys(self.username)
+            self.wait.until(EC.element_to_be_clickable((By.ID, 'idSIButton9'))).click()
 
-    print("Submitting...")
-    wait.until(EC.presence_of_element_located((By.XPATH, '//*[@id="idSIButton9"]'))).click()
+            # Enter password
+            password_field = self.wait.until(EC.presence_of_element_located((By.ID, 'passwordInput')))
+            password_field.send_keys(self.password)
+            self.wait.until(EC.element_to_be_clickable((By.ID, 'submitButton'))).click()
 
-    print("Entering password...")
-    wait.until(EC.presence_of_element_located((By.XPATH, '//*[@id="passwordInput"]'))).send_keys('XXXXXXX')
+            # Handle "Stay signed in" prompt
+            self.wait.until(EC.element_to_be_clickable((By.ID, 'idSIButton9'))).click()
+            logger.info("Login successful")
 
-    print("Submitting...")
-    wait.until(EC.presence_of_element_located((By.XPATH, '//*[@id="submitButton"]'))).click()
+        except TimeoutException as e:
+            logger.error(f"Timeout during login process: {str(e)}")
+            raise
+        except WebDriverException as e:
+            logger.error(f"WebDriver error during login: {str(e)}")
+            raise
 
-    print("Confirm stay signed in...")
-    wait.until(EC.element_to_be_clickable((By.XPATH, '//*[@id="idSIButton9"]'))).click()
+    def handle_time_tracking(self):
+        """Handle the clock in/out process"""
+        try:
+            logger.info("Looking for clock in/out buttons...")
+            
+            # Using more reliable selectors
+            clock_buttons = self.wait.until(
+                EC.presence_of_all_elements_located((By.CSS_SELECTOR, "app-clock button"))
+            )
+            
+            if len(clock_buttons) < 2:
+                raise ValueError("Could not find both clock in and clock out buttons")
 
-    print("Looking for clock in/out buttons...")
-    clock_in_button = wait.until(
-        EC.presence_of_element_located((By.XPATH, '/html/body/app-root/div/div/div/app-clockin/div[2]/div/div/app-clock/div/div[1]/div[2]/button[1]'))  # Replace with the actual ID
-    )
-    clock_out_button = wait.until(
-        EC.presence_of_element_located((By.XPATH, '/html/body/app-root/div/div/div/app-clockin/div[2]/div/div/app-clock/div/div[1]/div[2]/button[2]'))  # Replace with the actual ID
-    )
-    print("Clock buttons found.")
+            clock_in_button = clock_buttons[0]
+            clock_out_button = clock_buttons[1]
 
-    if clock_in_button.get_attribute("disabled"):
-        print("Clicking Clock Out")
-        action = ActionChains(driver)
-        action.move_to_element(clock_out_button).click().perform()
-    else:
-        print("Clicking Clock In")
-        action = ActionChains(driver)
-        action.move_to_element(clock_in_button).click().perform()
+            if clock_in_button.get_attribute("disabled"):
+                logger.info("Performing Clock Out")
+                ActionChains(self.driver).move_to_element(clock_out_button).click().perform()
+            else:
+                logger.info("Performing Clock In")
+                ActionChains(self.driver).move_to_element(clock_in_button).click().perform()
 
-finally:
-    # Close the browser after execution
-    driver.quit()
+        except TimeoutException as e:
+            logger.error(f"Timeout while handling time tracking: {str(e)}")
+            raise
+        except WebDriverException as e:
+            logger.error(f"WebDriver error during time tracking: {str(e)}")
+            raise
 
-print("Done.")
+    def run(self):
+        """Main execution method"""
+        try:
+            self.setup_driver()
+            self.login()
+            self.handle_time_tracking()
+            logger.info("Time tracking operation completed successfully")
+        except Exception as e:
+            logger.error(f"An error occurred: {str(e)}")
+            raise
+        finally:
+            if self.driver:
+                self.driver.quit()
+                logger.info("Browser session closed")
 
+if __name__ == "__main__":
+    try:
+        automation = TimeTrackingAutomation()
+        automation.run()
+    except Exception as e:
+        logger.error(f"Script failed: {str(e)}")
+        exit(1)
