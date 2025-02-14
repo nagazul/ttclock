@@ -42,9 +42,12 @@ nvim .env
 
 6. Run the Script
 ```
-uv run python time.py       # Default action is 'switch'
-uv run python time.py in    # Force clock-in
-uv run python time.py out   # Force clock-out
+uv run python time.py                 # Default action is 'status'
+uv run python time.py status -q | jq  # Check status explicitly (!ntfy)
+uv run python time.py in              # Force clock-in
+uv run python time.py out             # Force clock-out
+uv run python time.py switch          # Switch in/out
+uv run python time.py -q              # any command with notifications disabled
 ```
 
 ## Notes
