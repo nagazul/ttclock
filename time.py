@@ -35,6 +35,10 @@ class TimeTrackingAutomation:
         chrome_options.add_argument("--disable-infobars")
         chrome_options.add_argument("--start-maximized")
         chrome_options.add_argument("--incognito")
+        chrome_options.add_argument("--headless=new")  # Modern headless mode
+        chrome_options.add_argument("--disable-gpu")   # Recommended for headless
+        chrome_options.add_argument("--no-sandbox")    # Required for some Linux systems
+        chrome_options.add_argument("--disable-dev-shm-usage")  # Prevent memory issues
         
         # Check common Chrome binary locations
         chrome_paths = [
@@ -92,7 +96,7 @@ class TimeTrackingAutomation:
             logger.error(f"WebDriver error during login: {str(e)}")
             raise
 
-    def handle_time_tracking(self):
+    def handle_time_tracking(self, action='switch'):
         """Handle the clock in/out process"""
         try:
             logger.info("Looking for clock in/out buttons...")
@@ -108,12 +112,31 @@ class TimeTrackingAutomation:
             clock_in_button = clock_buttons[0]
             clock_out_button = clock_buttons[1]
 
-            if clock_in_button.get_attribute("disabled"):
-                logger.info("Performing Clock Out")
-                ActionChains(self.driver).move_to_element(clock_out_button).click().perform()
-            else:
+            # Check current state
+            is_clocked_in = clock_in_button.get_attribute("disabled")
+            
+            # Determine action based on input and current state
+            should_clock_in = {
+                'in': True,
+                'out': False,
+                'switch': not is_clocked_in
+            }.get(action)
+            
+            # If we're already in the desired state, log and return
+            if should_clock_in and is_clocked_in:
+                logger.info("Already clocked in")
+                return
+            elif not should_clock_in and not is_clocked_in:
+                logger.info("Already clocked out")
+                return
+            
+            # Perform the action
+            if should_clock_in:
                 logger.info("Performing Clock In")
                 ActionChains(self.driver).move_to_element(clock_in_button).click().perform()
+            else:
+                logger.info("Performing Clock Out")
+                ActionChains(self.driver).move_to_element(clock_out_button).click().perform()
 
         except TimeoutException as e:
             logger.error(f"Timeout while handling time tracking: {str(e)}")
@@ -122,12 +145,12 @@ class TimeTrackingAutomation:
             logger.error(f"WebDriver error during time tracking: {str(e)}")
             raise
 
-    def run(self):
+    def run(self, action='switch'):
         """Main execution method"""
         try:
             self.setup_driver()
             self.login()
-            self.handle_time_tracking()
+            self.handle_time_tracking(action)
             logger.info("Time tracking operation completed successfully")
         except Exception as e:
             logger.error(f"An error occurred: {str(e)}")
@@ -138,9 +161,18 @@ class TimeTrackingAutomation:
                 logger.info("Browser session closed")
 
 if __name__ == "__main__":
+    import argparse
+    
+    parser = argparse.ArgumentParser(description='Time tracking automation')
+    parser.add_argument('action', nargs='?', choices=['in', 'out', 'switch'], 
+                       default='switch',
+                       help='Specify action: "in" to clock in, "out" to clock out, "switch" to toggle (default)')
+    
+    args = parser.parse_args()
+    
     try:
         automation = TimeTrackingAutomation()
-        automation.run()
+        automation.run(action=args.action)
     except Exception as e:
         logger.error(f"Script failed: {str(e)}")
         exit(1)
