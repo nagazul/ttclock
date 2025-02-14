@@ -1,4 +1,5 @@
 import os
+import requests
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.action_chains import ActionChains
@@ -10,6 +11,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.chrome.service import Service
 import logging
 from dotenv import load_dotenv
+from datetime import datetime
 
 # Configure logging
 logging.basicConfig(
@@ -26,8 +28,29 @@ class TimeTrackingAutomation:
         self.url = os.getenv('TIMETRACKING_URL')
         self.username = os.getenv('TIMETRACKING_USERNAME')
         self.password = os.getenv('TIMETRACKING_PASSWORD')
+        self.ntfy_topic = os.getenv('NTFY_TOPIC', 'ttclock')
         self.driver = None
         self.wait = None
+
+    def send_notification(self, message, priority='default', tags=None):
+        """Send notification to ntfy.sh"""
+        try:
+            current_time = datetime.now().strftime('%H:%M:%S')
+            data = f"[{current_time}] {message}"
+            headers = {
+                "Priority": priority,
+                "Tags": ','.join(tags) if tags else "clock"
+            }
+            
+            response = requests.post(
+                f"https://ntfy.sh/{self.ntfy_topic}",
+                data=data.encode(encoding='utf-8'),
+                headers=headers
+            )
+            response.raise_for_status()
+            logger.info(f"Notification sent: {message}")
+        except Exception as e:
+            logger.error(f"Failed to send notification: {str(e)}")
 
     def setup_driver(self):
         """Configure and initialize the Chrome WebDriver"""
@@ -124,18 +147,26 @@ class TimeTrackingAutomation:
             
             # If we're already in the desired state, log and return
             if should_clock_in and is_clocked_in:
-                logger.info("Already clocked in")
+                msg = "Already clocked in"
+                logger.info(msg)
+                self.send_notification(msg, tags=["clock", "info"])
                 return
             elif not should_clock_in and not is_clocked_in:
-                logger.info("Already clocked out")
+                msg = "Already clocked out"
+                logger.info(msg)
+                self.send_notification(msg, tags=["clock", "info"])
                 return
             
             # Perform the action
             if should_clock_in:
-                logger.info("Performing Clock In")
+                msg = "Performing Clock In"
+                logger.info(msg)
+                self.send_notification(msg, tags=["clock", "in"])
                 ActionChains(self.driver).move_to_element(clock_in_button).click().perform()
             else:
-                logger.info("Performing Clock Out")
+                msg = "Performing Clock Out"
+                logger.info(msg)
+                self.send_notification(msg, tags=["clock", "out"])
                 ActionChains(self.driver).move_to_element(clock_out_button).click().perform()
 
         except TimeoutException as e:
@@ -153,7 +184,9 @@ class TimeTrackingAutomation:
             self.handle_time_tracking(action)
             logger.info("Time tracking operation completed successfully")
         except Exception as e:
-            logger.error(f"An error occurred: {str(e)}")
+            error_msg = f"An error occurred: {str(e)}"
+            logger.error(error_msg)
+            self.send_notification(error_msg, priority="high", tags=["clock", "error"])
             raise
         finally:
             if self.driver:
