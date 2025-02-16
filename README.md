@@ -42,23 +42,23 @@ nvim .env
 
 6. Run the Script
 ```
-uv run python time.py                 # Default action is 'status'
-uv run python time.py status -q | jq  # Check status explicitly (!ntfy)
-uv run python time.py in              # Force clock-in
-uv run python time.py out             # Force clock-out
-uv run python time.py auto-out        # Clock-out only if time_left if 00:00:00 
-uv run python time.py switch          # Switch in/out
-uv run python time.py -q              # Any command with notifications disabled
+uv run time.py                 # Default action is 'status'
+uv run time.py status -q | jq  # Check status explicitly (!ntfy)
+uv run time.py in              # Force clock-in
+uv run time.py out             # Force clock-out
+uv run time.py auto-out        # Clock-out only if time_left if 00:00:00 
+uv run time.py switch          # Switch in/out
+uv run time.py -q              # Any command with notifications disabled
 
-uv run python time.py switch -r 1 5   # Random delay between 1-5 minutes before switch
+uv run time.py switch -r 1 5   # Random delay between 1-5 minutes before switch
 
 # Verbosity levels (can be combined with any command):
-uv run python time.py -v              # Basic operational messages
-uv run python time.py -vv             # Detailed operation messages
-uv run python time.py -vvv            # Full debug output
+uv run time.py -v              # Basic operational messages
+uv run time.py -vv             # Detailed operation messages
+uv run time.py -vvv            # Full debug output
 
 # Get the time clocked today
-uv run python time.py -q | jq -r '.time_worked'
+uv run time.py -q | jq -r '.time_worked'
 ```
 
 ## Notes
