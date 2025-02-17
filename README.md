@@ -42,23 +42,30 @@ nvim .env
 
 6. Run the Script
 ```
-uv run time.py                 # Default action is 'status'
-uv run time.py status -q | jq  # Check status explicitly (!ntfy)
-uv run time.py in              # Force clock-in
-uv run time.py out             # Force clock-out
-uv run time.py auto-out        # Clock-out only if time_left if 00:00:00 
-uv run time.py switch          # Switch in/out
-uv run time.py -q              # Any command with notifications disabled
+uv run time.py                    # Default action is 'status' (quiet)
+uv run time.py status | jq        # Check status and format JSON output
+uv run time.py status -n          # Check status with ntfy notifications
+uv run time.py in                 # Force clock-in (quiet)
+uv run time.py in -n              # Force clock-in with notifications
+uv run time.py out                # Force clock-out (quiet)
+uv run time.py auto-out           # Clock-out only if time_left is 00:00:00 
+uv run time.py switch             # Switch in/out (quiet)
+uv run time.py -q                 # Force quiet mode (overrides -n)
 
-uv run time.py switch -r 1 5   # Random delay between 1-5 minutes before switch
+uv run time.py switch -r 1 5      # Random delay between 1-5 minutes before switch
 
 # Verbosity levels (can be combined with any command):
-uv run time.py -v              # Basic operational messages
-uv run time.py -vv             # Detailed operation messages
-uv run time.py -vvv            # Full debug output
+uv run time.py -v                 # Basic operational messages
+uv run time.py -vv                # Detailed operation messages
+uv run time.py -vvv               # Full debug output
 
 # Get the time clocked today
-uv run time.py -q | jq -r '.time_worked'
+uv run time.py | jq -r '.time_worked'
+
+# Notification examples:
+uv run time.py status -n          # Status check with notifications
+uv run time.py switch -n -r 1 5   # Switch with notifications and random delay
+uv run time.py -n -q              # -q overrides -n, runs in quiet mode
 ```
 
 ## Notes
