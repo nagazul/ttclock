@@ -364,6 +364,9 @@ if __name__ == "__main__":
     import time
     import signal
 
+    # Get the full command that was executed
+    command = f"Command executed: {sys.executable} {' '.join(sys.argv)}"
+
     parser = argparse.ArgumentParser(description='Time tracking automation')
     parser.add_argument('action', nargs='?', choices=['in', 'out', 'switch', 'status', 'auto-out'],
                        default='status',
@@ -379,6 +382,10 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     setup_logging(args.verbose)
+
+    # Log the command after setting up logging
+    logger.info(command)
+
     automation = None
 
     try:
