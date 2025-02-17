@@ -1,4 +1,11 @@
 import os
+import sys
+import json
+import argparse
+import random
+import time
+import signal
+import logging
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.action_chains import ActionChains
@@ -8,7 +15,6 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, WebDriverException
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.chrome.service import Service
-import logging
 from dotenv import load_dotenv
 import requests
 from datetime import datetime
@@ -21,10 +27,10 @@ def setup_logging(verbosity=0):
     handler = logging.StreamHandler(sys.stderr)
     handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
     root_logger.addHandler(handler)
-    
+
     # Configure our script's logger
     script_logger = logging.getLogger(__name__)
-    
+
     if verbosity == 0:  # Silent mode
         script_logger.setLevel(logging.ERROR)
         logging.getLogger('selenium').setLevel(logging.ERROR)
@@ -56,15 +62,24 @@ class TimeCheckAutomation:
         self.url = os.getenv('TIMETRACKING_URL')
         self.username = os.getenv('TIMETRACKING_USERNAME')
         self.password = os.getenv('TIMETRACKING_PASSWORD')
-        self.ntfy_topic = os.getenv('NTFY_TOPIC', '') if not quiet else ''  # kept for future use
+        self.ntfy_topic = os.getenv('NTFY_TOPIC', '') if not quiet else ''
         self.driver = None
         self.wait = None
+
+    def cleanup(self):
+        """Cleanup resources"""
+        if self.driver:
+            try:
+                logger.info("Cleaning up browser session...")
+                self.driver.quit()
+            except Exception as e:
+                logger.error(f"Error during cleanup: {str(e)}")
 
     def send_notification(self, message, priority='default', tags=None):
         """Send notification to ntfy.sh if topic is configured"""
         if not self.ntfy_topic:
             return
-            
+
         try:
             current_time = datetime.now().strftime('%H:%M:%S')
             data = f"[{current_time}] {message}"
@@ -72,7 +87,7 @@ class TimeCheckAutomation:
                 "Priority": priority,
                 "Tags": ','.join(tags) if tags else "time"
             }
-            
+
             response = requests.post(
                 f"https://ntfy.sh/{self.ntfy_topic}",
                 data=data.encode(encoding='utf-8'),
@@ -94,7 +109,7 @@ class TimeCheckAutomation:
         chrome_options.add_argument("--disable-gpu")
         chrome_options.add_argument("--no-sandbox")
         chrome_options.add_argument("--disable-dev-shm-usage")
-        
+
         logger.debug("Checking for Chrome binary locations...")
         # Check common Chrome binary locations
         chrome_paths = [
@@ -103,23 +118,23 @@ class TimeCheckAutomation:
             '/usr/bin/chromium',
             '/usr/bin/chromium-browser'
         ]
-        
+
         chrome_binary = None
         for path in chrome_paths:
             logger.debug(f"Checking path: {path}")
             if os.path.exists(path):
                 chrome_binary = path
                 break
-                
+
         if chrome_binary:
             chrome_options.binary_location = chrome_binary
             logger.info(f"Using Chrome binary at: {chrome_binary}")
         else:
             logger.warning("Could not find Chrome binary in common locations")
-        
+
         logger.debug("Setting up ChromeDriver service...")
         service = Service(ChromeDriverManager().install())
-        
+
         logger.debug("Initializing Chrome WebDriver...")
         self.driver = webdriver.Chrome(service=service, options=chrome_options)
         self.driver.set_window_size(1920, 1080)
@@ -137,7 +152,7 @@ class TimeCheckAutomation:
             username_field = self.wait.until(EC.presence_of_element_located((By.NAME, 'loginfmt')))
             logger.debug("Entering username...")
             username_field.send_keys(self.username)
-            
+
             logger.debug("Waiting for next button...")
             next_button = self.wait.until(EC.element_to_be_clickable((By.ID, 'idSIButton9')))
             logger.debug("Clicking next button...")
@@ -147,7 +162,7 @@ class TimeCheckAutomation:
             password_field = self.wait.until(EC.presence_of_element_located((By.ID, 'passwordInput')))
             logger.debug("Entering password...")
             password_field.send_keys(self.password)
-            
+
             logger.debug("Waiting for submit button...")
             submit_button = self.wait.until(EC.element_to_be_clickable((By.ID, 'submitButton')))
             logger.debug("Clicking submit button...")
@@ -157,13 +172,13 @@ class TimeCheckAutomation:
             stay_signed_in = self.wait.until(EC.element_to_be_clickable((By.ID, 'idSIButton9')))
             logger.debug("Handling 'Stay signed in' prompt...")
             stay_signed_in.click()
-            
+
             # Wait for the app to fully load
             logger.debug("Waiting for app-root element...")
             self.wait.until(EC.presence_of_element_located((By.TAG_NAME, 'app-root')))
             logger.debug("Waiting for app-clock element...")
             self.wait.until(EC.presence_of_element_located((By.TAG_NAME, 'app-clock')))
-            
+
             logger.info("Login successful and app loaded")
             logger.debug(f"Final URL after login: {self.driver.current_url}")
 
@@ -180,38 +195,38 @@ class TimeCheckAutomation:
         """Get the time information from the page"""
         try:
             logger.info("Looking for time information...")
-            
+
             # Get all rows with time data
             rows = self.wait.until(
                 EC.presence_of_all_elements_located((By.CSS_SELECTOR, "table.clocking-info tr"))
             )
-            
+
             times = {}
             # Extract information from each row
             for row in rows:
                 label = row.find_element(By.CLASS_NAME, "td-cell").text.strip()
                 value = row.find_element(By.CLASS_NAME, "td-data").text.strip()
-                
+
                 # Convert date format if this is the date field
                 if label == "Current Date":
                     # Convert from DD/MM/YYYY to YYYY-MM-DD
                     day, month, year = value.split('/')
                     value = f"{year}-{month}-{day}"
-                
+
                 times[label] = value
-            
+
             # Get clock status
             clock_buttons = self.wait.until(
                 EC.presence_of_all_elements_located((By.CSS_SELECTOR, "app-clock button"))
             )
-            
+
             if len(clock_buttons) < 2:
                 raise ValueError("Could not find clock buttons")
 
             clock_in_button = clock_buttons[0]
             is_clocked_in = clock_in_button.get_attribute("disabled") is not None
             status = "Clocked In" if is_clocked_in else "Clocked Out"
-            
+
             # Prepare message with all information
             message = (
                 f"Status: {status}\n"
@@ -220,10 +235,10 @@ class TimeCheckAutomation:
                 f"Time left: {times.get('Time left', 'N/A')}\n"
                 f"Date: {times.get('Current Date', 'N/A')}"
             )
-            
+
             logger.info(message)
             self.send_notification(message, tags=["time", "check"])
-            
+
             return {
                 'status': status,
                 'first_clock': times.get('First clock in'),
@@ -242,12 +257,12 @@ class TimeCheckAutomation:
         """Handle the clock in/out process"""
         try:
             logger.info("Looking for clock in/out buttons...")
-            
+
             # Using more reliable selectors
             clock_buttons = self.wait.until(
                 EC.presence_of_all_elements_located((By.CSS_SELECTOR, "app-clock button"))
             )
-            
+
             if len(clock_buttons) < 2:
                 raise ValueError("Could not find both clock in and clock out buttons")
 
@@ -256,14 +271,14 @@ class TimeCheckAutomation:
 
             # Check current state
             is_clocked_in = clock_in_button.get_attribute("disabled") is not None
-            
+
             # Determine action based on input and current state
             should_clock_in = {
                 'in': True,
                 'out': False,
                 'switch': not is_clocked_in
             }.get(action)
-            
+
             # If we're already in the desired state, log and return
             if should_clock_in and is_clocked_in:
                 msg = "Already clocked in"
@@ -275,7 +290,7 @@ class TimeCheckAutomation:
                 logger.info(msg)
                 self.send_notification(msg, tags=["clock", "info"])
                 return
-            
+
             # Perform the action
             if should_clock_in:
                 msg = "Performing Clock In"
@@ -319,7 +334,7 @@ class TimeCheckAutomation:
                 delay_min = delay / 60
                 logger.info(f"Random delay activated: waiting {delay_min:.2f} minutes...")
                 time.sleep(delay)
-                
+
             self.setup_driver()
             self.login()
             self.handle_time_tracking(action)
@@ -334,13 +349,21 @@ class TimeCheckAutomation:
                 self.driver.quit()
                 logger.info("Browser session closed")
 
+def handle_interrupt(automation=None):
+    """Handle keyboard interrupt gracefully"""
+    print("\nReceived interrupt signal. Shutting down gracefully...", file=sys.stderr)
+    if automation:
+        automation.cleanup()
+    sys.exit(0)
+
 if __name__ == "__main__":
     import sys
     import json
     import argparse
     import random
     import time
-    
+    import signal
+
     parser = argparse.ArgumentParser(description='Time tracking automation')
     parser.add_argument('action', nargs='?', choices=['in', 'out', 'switch', 'status', 'auto-out'],
                        default='status',
@@ -355,21 +378,25 @@ if __name__ == "__main__":
                        help='Random delay between MIN and MAX minutes before action')
 
     args = parser.parse_args()
-    
-    # Setup logging based on verbosity level
     setup_logging(args.verbose)
-    
+    automation = None
+
     try:
+        # Set up signal handler for graceful shutdown
+        automation = TimeCheckAutomation(quiet=args.quiet or not args.ntfy)
+        signal.signal(signal.SIGINT, lambda signum, frame: handle_interrupt(automation))
+
         # Handle random delay if specified
         if args.random_delay:
             min_delay, max_delay = args.random_delay
             delay_secs = random.uniform(min_delay * 60, max_delay * 60)
             if not args.quiet:
                 print(f"Waiting {delay_secs/60:.2f} minutes...", file=sys.stderr)
-            time.sleep(delay_secs)
+            try:
+                time.sleep(delay_secs)
+            except KeyboardInterrupt:
+                handle_interrupt(automation)
 
-        automation = TimeCheckAutomation(quiet=args.quiet or not args.ntfy)
-        
         if args.action == 'status':
             time_info = automation.run()
             print(json.dumps(time_info, indent=2), file=sys.stdout)
@@ -382,6 +409,10 @@ if __name__ == "__main__":
                 print("No action needed.", file=sys.stdout)
         else:
             automation.run_clock_action(args.action)
+    except KeyboardInterrupt:
+        handle_interrupt(automation)
     except Exception as e:
         logger.error(f"Script failed: {str(e)}")
-        exit(1)
+        if automation:
+            automation.cleanup()
+        sys.exit(1)
