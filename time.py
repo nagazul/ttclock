@@ -52,11 +52,11 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 class TimeCheckAutomation:
-    def __init__(self, quiet=False):
+    def __init__(self, quiet=True):
         self.url = os.getenv('TIMETRACKING_URL')
         self.username = os.getenv('TIMETRACKING_USERNAME')
         self.password = os.getenv('TIMETRACKING_PASSWORD')
-        self.ntfy_topic = '' if quiet else os.getenv('NTFY_TOPIC', '')
+        self.ntfy_topic = os.getenv('NTFY_TOPIC', '') if not quiet else ''  # kept for future use
         self.driver = None
         self.wait = None
 
@@ -346,12 +346,14 @@ if __name__ == "__main__":
                        default='status',
                        help='Specify action: "in" to clock in, "out" to clock out, "switch" to toggle, "status" to check (default), "auto-out" for auto clock-out')
     parser.add_argument('-q', '--quiet', action='store_true',
-                       help='Disable ntfy notifications')
+                       help='Force disable notifications')
+    parser.add_argument('-n', '--ntfy', action='store_true',
+                       help='Enable notifications')
     parser.add_argument('-v', '--verbose', action='count', default=0,
                        help='Increase verbosity (can be used up to three times: -v, -vv, or -vvv)')
     parser.add_argument('-r', '--random-delay', type=float, nargs=2, metavar=('MIN', 'MAX'),
                        help='Random delay between MIN and MAX minutes before action')
-    
+
     args = parser.parse_args()
     
     # Setup logging based on verbosity level
@@ -366,7 +368,7 @@ if __name__ == "__main__":
                 print(f"Waiting {delay_secs/60:.2f} minutes...", file=sys.stderr)
             time.sleep(delay_secs)
 
-        automation = TimeCheckAutomation(quiet=args.quiet)
+        automation = TimeCheckAutomation(quiet=args.quiet or not args.ntfy)
         
         if args.action == 'status':
             time_info = automation.run()
