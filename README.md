@@ -105,12 +105,10 @@ uv run time.py -n -q              # -q overrides -n, runs in quiet mode
 ## Cron
 
 ```
-# Set TTPATH to the correct path to your script.
-TTCRON=/home/.../ttclock/ttcron.sh
-50 07 * * 1-5 $TTCRON in
-10 13 * * 1-5 $TTCRON out         # 50 minutes nap
-00 14 * * 1-5 $TTCRON in
-0,30 16-17 * * 1-5 $TTCRON auto   # Try to clock out every 30 minutes if time is up
+50 07 * * 1-5 /home/.../ttclock/ttcron.sh in          # Clock in
+10 13 * * 1-5 /home/.../ttclock/ttcron.sh out         # nap
+00 14 * * 1-5 /home/.../ttclock/ttcron.sh in
+0,30 16-17 * * 1-5 /home/.../ttclock/ttcron.sh auto   # Clock out
 ```
 
 ## Notes
