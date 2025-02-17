@@ -9,24 +9,53 @@ This script automates clocking in and out on a web-based time-tracking system us
  - Sends notifications via ntfy.sh
  - Uses Selenium WebDriver (Chrome)
 
-## Installation
+## Dependencies
 
-1. Install uv (if not already installed)
-```
+- Google Chrome or Chromium browser
+- uv package manager
+- jq (optional, for JSON processing)
+- ntfy.sh account (optional, for notifications)
+
+### Installing Dependencies
+
+1. Install uv package manager (if not already installed):
+```bash
 pip install uv || curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-2. Clone the Repository
+2. Install Chrome/Chromium browser:
+```bash
+# Ubuntu
+sudo apt install google-chrome-stable
+
+# macOS
+brew install --cask google-chrome
 ```
+
+3. Install jq (optional, for JSON processing):
+```bash
+# Ubuntu
+sudo apt install jq
+
+# macOS
+brew install jq
+```
+
+## Installation
+
+1. Clone the Repository:
+```bash
 git clone https://github.com/nagazul/ttclock.git
 cd ttclock
 ```
-3. Set Up the Virtual Environment
-```
+
+2. Set Up the Virtual Environment:
+```bash
 uv venv .venv
 ```
-4. Install Dependencies
-```
+
+3. Install Python Dependencies:
+```bash
 # If using requirements.txt:
 uv pip install -r requirements.txt
 
@@ -34,14 +63,15 @@ uv pip install -r requirements.txt
 uv sync
 ```
 
-5. Copy and Modify .env File
-```
+4. Configure Environment:
+```bash
 cp .env.example .env
 nvim .env
 ```
 
-6. Run the Script
-```
+## Usage
+
+```bash
 uv run time.py                    # Default action is 'status' (quiet)
 uv run time.py status | jq        # Check status and format JSON output
 uv run time.py status -n          # Check status with ntfy notifications
