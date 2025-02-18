@@ -21,32 +21,30 @@ from datetime import datetime
 
 # Configure logging
 def setup_logging(verbosity=0):
-    # Configure root logger to stderr
     root_logger = logging.getLogger()
-    root_logger.setLevel(logging.ERROR)  # Default to ERROR for root logger
+    root_logger.setLevel(logging.ERROR)
     handler = logging.StreamHandler(sys.stderr)
     handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
     root_logger.addHandler(handler)
 
-    # Configure our script's logger
     script_logger = logging.getLogger(__name__)
 
-    if verbosity == 0:  # Silent mode
+    if verbosity == 0:
         script_logger.setLevel(logging.ERROR)
         logging.getLogger('selenium').setLevel(logging.ERROR)
         logging.getLogger('urllib3').setLevel(logging.ERROR)
         logging.getLogger('WDM').setLevel(logging.ERROR)
-    elif verbosity == 1:  # -v: Basic script messages
+    elif verbosity == 1:
         script_logger.setLevel(logging.INFO)
         logging.getLogger('selenium').setLevel(logging.ERROR)
         logging.getLogger('urllib3').setLevel(logging.ERROR)
         logging.getLogger('WDM').setLevel(logging.ERROR)
-    elif verbosity == 2:  # -vv: More detailed messages
+    elif verbosity == 2:
         script_logger.setLevel(logging.DEBUG)
         logging.getLogger('selenium').setLevel(logging.WARNING)
         logging.getLogger('urllib3').setLevel(logging.WARNING)
         logging.getLogger('WDM').setLevel(logging.INFO)
-    else:  # -vvv: All debug messages
+    else:
         script_logger.setLevel(logging.DEBUG)
         logging.getLogger('selenium').setLevel(logging.DEBUG)
         logging.getLogger('urllib3').setLevel(logging.DEBUG)
@@ -55,7 +53,16 @@ def setup_logging(verbosity=0):
 logger = logging.getLogger(__name__)
 
 # Load environment variables
-load_dotenv()
+def load_environment(env_file=None):
+    """Load environment variables from a custom .env file if specified, then from default .env"""
+    if env_file:
+        if os.path.exists(env_file):
+            load_dotenv(env_file, override=True)
+            logger.info(f"Loaded custom environment file: {env_file}")
+        else:
+            logger.error(f"Custom environment file not found: {env_file}")
+            sys.exit(1)
+    load_dotenv()  # Load default .env file (if exists) after custom one
 
 class TimeCheckAutomation:
     def __init__(self, quiet=True):
@@ -111,7 +118,6 @@ class TimeCheckAutomation:
         chrome_options.add_argument("--disable-dev-shm-usage")
 
         logger.debug("Checking for Chrome binary locations...")
-        # Check common Chrome binary locations
         chrome_paths = [
             '/usr/bin/google-chrome',
             '/usr/bin/google-chrome-stable',
@@ -173,7 +179,6 @@ class TimeCheckAutomation:
             logger.debug("Handling 'Stay signed in' prompt...")
             stay_signed_in.click()
 
-            # Wait for the app to fully load
             logger.debug("Waiting for app-root element...")
             self.wait.until(EC.presence_of_element_located((By.TAG_NAME, 'app-root')))
             logger.debug("Waiting for app-clock element...")
@@ -196,26 +201,21 @@ class TimeCheckAutomation:
         try:
             logger.info("Looking for time information...")
 
-            # Get all rows with time data
             rows = self.wait.until(
                 EC.presence_of_all_elements_located((By.CSS_SELECTOR, "table.clocking-info tr"))
             )
 
             times = {}
-            # Extract information from each row
             for row in rows:
                 label = row.find_element(By.CLASS_NAME, "td-cell").text.strip()
                 value = row.find_element(By.CLASS_NAME, "td-data").text.strip()
 
-                # Convert date format if this is the date field
                 if label == "Current Date":
-                    # Convert from DD/MM/YYYY to YYYY-MM-DD
                     day, month, year = value.split('/')
                     value = f"{year}-{month}-{day}"
 
                 times[label] = value
 
-            # Get clock status
             clock_buttons = self.wait.until(
                 EC.presence_of_all_elements_located((By.CSS_SELECTOR, "app-clock button"))
             )
@@ -227,7 +227,6 @@ class TimeCheckAutomation:
             is_clocked_in = clock_in_button.get_attribute("disabled") is not None
             status = "Clocked In" if is_clocked_in else "Clocked Out"
 
-            # Prepare message with all information
             message = (
                 f"Status: {status}\n"
                 f"First clock in: {times.get('First clock in', 'N/A')}\n"
@@ -258,7 +257,6 @@ class TimeCheckAutomation:
         try:
             logger.info("Looking for clock in/out buttons...")
 
-            # Using more reliable selectors
             clock_buttons = self.wait.until(
                 EC.presence_of_all_elements_located((By.CSS_SELECTOR, "app-clock button"))
             )
@@ -269,17 +267,14 @@ class TimeCheckAutomation:
             clock_in_button = clock_buttons[0]
             clock_out_button = clock_buttons[1]
 
-            # Check current state
             is_clocked_in = clock_in_button.get_attribute("disabled") is not None
 
-            # Determine action based on input and current state
             should_clock_in = {
                 'in': True,
                 'out': False,
                 'switch': not is_clocked_in
             }.get(action)
 
-            # If we're already in the desired state, log and return
             if should_clock_in and is_clocked_in:
                 msg = "Already clocked in"
                 logger.info(msg)
@@ -291,7 +286,6 @@ class TimeCheckAutomation:
                 self.send_notification(msg, tags=["clock", "info"])
                 return
 
-            # Perform the action
             if should_clock_in:
                 msg = "Performing Clock In"
                 logger.info(msg)
@@ -330,7 +324,7 @@ class TimeCheckAutomation:
         try:
             if random_delay:
                 min_delay, max_delay = random_delay
-                delay = random.uniform(min_delay * 60, max_delay * 60)  # Convert to seconds
+                delay = random.uniform(min_delay * 60, max_delay * 60)
                 delay_min = delay / 60
                 logger.info(f"Random delay activated: waiting {delay_min:.2f} minutes...")
                 time.sleep(delay)
@@ -357,14 +351,6 @@ def handle_interrupt(automation=None):
     sys.exit(0)
 
 if __name__ == "__main__":
-    import sys
-    import json
-    import argparse
-    import random
-    import time
-    import signal
-
-    # Get the full command that was executed
     command = f"Command executed: {sys.executable} {' '.join(sys.argv)}"
 
     parser = argparse.ArgumentParser(description='Time tracking automation')
@@ -379,21 +365,21 @@ if __name__ == "__main__":
                        help='Increase verbosity (can be used up to three times: -v, -vv, or -vvv)')
     parser.add_argument('-r', '--random-delay', type=float, nargs=2, metavar=('MIN', 'MAX'),
                        help='Random delay between MIN and MAX minutes before action')
+    parser.add_argument('--env-file', type=str,
+                       help='Path to custom .env file to load environment variables from')
 
     args = parser.parse_args()
     setup_logging(args.verbose)
 
-    # Log the command after setting up logging
     logger.info(command)
+    load_environment(args.env_file)
 
     automation = None
 
     try:
-        # Set up signal handler for graceful shutdown
         automation = TimeCheckAutomation(quiet=args.quiet or not args.ntfy)
         signal.signal(signal.SIGINT, lambda signum, frame: handle_interrupt(automation))
 
-        # Handle random delay if specified
         if args.random_delay:
             min_delay, max_delay = args.random_delay
             delay_secs = random.uniform(min_delay * 60, max_delay * 60)
@@ -408,18 +394,13 @@ if __name__ == "__main__":
             time_info = automation.run()
             print(json.dumps(time_info, indent=2), file=sys.stdout)
         elif args.action == 'auto-out':
-            # For auto-out, create automation with notifications disabled
-            # We'll only enable notifications if we actually need to clock out
             quiet_automation = TimeCheckAutomation(quiet=True)
             time_info = quiet_automation.run()
             
             if time_info.get('time_left') == "00:00:00" and time_info.get('status') != "Clocked Out":
-                # Time is out and we need to clock out - now we use the real automation object
-                # with notifications as configured by command line arguments
                 automation.run_clock_action("out")
                 logger.info("Auto clock-out completed successfully")
             else:
-                # No action needed, just log without notification
                 logger.info("Auto-out not needed: either already clocked out or time remaining")
         else:
             automation.run_clock_action(args.action)
