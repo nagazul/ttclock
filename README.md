@@ -105,10 +105,10 @@ uv run time.py -n -q              # -q overrides -n, runs in quiet mode
 ## Cron
 
 ```
-50 07 * * 1-5 /home/.../ttclock/ttcron.sh in          # Clock in
-10 13 * * 1-5 /home/.../ttclock/ttcron.sh out         # nap
+50 07 * * 1-5 /home/.../ttclock/ttcron.sh in --ntfy          # Clock in
+10 13 * * 1-5 /home/.../ttclock/ttcron.sh out                # nap
 00 14 * * 1-5 /home/.../ttclock/ttcron.sh in
-0,30 16-17 * * 1-5 /home/.../ttclock/ttcron.sh auto   # Clock out
+0,30 16-17 * * 1-5 /home/.../ttclock/ttcron.sh auto --ntfy   # Clock out
 ```
 
 ## Notes
