@@ -34,23 +34,45 @@ run_time() {
     local min_delay=${2:-0}
     local max_delay=${3:-0}
     local notify_flag=$4
-    
+    local env_file=$5
+
     if [ ! -f "time.py" ]; then
         echo "Error: time.py not found in ${TTPATH}"
         exit 1
     fi
+
+    # Build the command with optional parameters
+    local cmd="python time.py -vv"
     
     # Add notification flag if specified
     if [ "$notify_flag" = true ]; then
-        python time.py -vv -n -r "$min_delay" "$max_delay" "$action" >> "$LOGFILE" 2>&1
-    else
-        python time.py -vv -r "$min_delay" "$max_delay" "$action" >> "$LOGFILE" 2>&1
+        cmd="$cmd -n"
     fi
+    
+    # Add random delay if specified
+    if [ "$min_delay" != "0" ] || [ "$max_delay" != "0" ]; then
+        cmd="$cmd -r $min_delay $max_delay"
+    fi
+    
+    # Add env-file if specified
+    if [ -n "$env_file" ]; then
+        if [ -f "$env_file" ]; then
+            cmd="$cmd --env-file $env_file"
+        else
+            echo "Error: Specified env-file '$env_file' does not exist"
+            exit 1
+        fi
+    fi
+    
+    # Add the action and execute
+    cmd="$cmd $action"
+    eval "$cmd >> $LOGFILE 2>&1"
 }
 
 # Parse command line options
 NOTIFY=false
 COMMAND=""
+ENV_FILE=""
 
 while [ "$#" -gt 0 ]; do
     case "$1" in
@@ -58,13 +80,22 @@ while [ "$#" -gt 0 ]; do
             NOTIFY=true
             shift
             ;;
+        --env-file)
+            if [ -z "$2" ]; then
+                echo "Error: --env-file requires a path argument"
+                echo "Usage: $0 [--ntfy] [--env-file PATH] {in|out|auto}"
+                exit 1
+            fi
+            ENV_FILE="$2"
+            shift 2
+            ;;
         in|out|auto)
             COMMAND="$1"
             shift
             ;;
         *)
             echo "Unknown option: $1"
-            echo "Usage: $0 [--ntfy] {in|out|auto}"
+            echo "Usage: $0 [--ntfy] [--env-file PATH] {in|out|auto}"
             exit 1
             ;;
     esac
@@ -72,7 +103,7 @@ done
 
 # Check if command is provided
 if [ -z "$COMMAND" ]; then
-    echo "Usage: $0 [--ntfy] {in|out|auto}"
+    echo "Usage: $0 [--ntfy] [--env-file PATH] {in|out|auto}"
     exit 1
 fi
 
@@ -80,18 +111,18 @@ fi
 case "$COMMAND" in
     "in")
         setup_env
-        run_time "in" 0 5 "$NOTIFY"
+        run_time "in" 0 5 "$NOTIFY" "$ENV_FILE"
         ;;
     "out")
         setup_env
-        run_time "out" 0 5 "$NOTIFY"
+        run_time "out" 0 5 "$NOTIFY" "$ENV_FILE"
         ;;
     "auto")
         setup_env
-        run_time "auto-out" 0 5 "$NOTIFY"
+        run_time "auto-out" 0 5 "$NOTIFY" "$ENV_FILE"
         ;;
     *)
-        echo "Usage: $0 [--ntfy] {in|out|auto}"
+        echo "Usage: $0 [--ntfy] [--env-file PATH] {in|out|auto}"
         exit 1
         ;;
 esac
