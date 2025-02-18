@@ -87,6 +87,7 @@ uv run time.py switch             # Switch in/out (quiet)
 uv run time.py -q                 # Force quiet mode (overrides -n)
 
 uv run time.py switch -r 1 5      # Random delay between 1-5 minutes before switch
+uv run time.py -r                 # Defaul random delay between 0-5 minutes
 
 uv run time.py --env-file .env    # Custom .env file (also works with ttcron.sh)
 
@@ -107,10 +108,10 @@ uv run time.py -n -q              # -q overrides -n, runs in quiet mode
 ## Cron
 
 ```
-50 07 * * 1-5 /home/.../ttclock/ttcron.sh in --ntfy          # Clock in
-10 13 * * 1-5 /home/.../ttclock/ttcron.sh out                # nap
-00 14 * * 1-5 /home/.../ttclock/ttcron.sh in
-0,30 16-17 * * 1-5 /home/.../ttclock/ttcron.sh auto --ntfy   # Clock out
+50 07 * * 1-5 /home/.../ttclock/ttcron.sh -r in --ntfy              # Clock in
+10 13 * * 1-5 /home/.../ttclock/ttcron.sh -r out                    # nap
+00 14 * * 1-5 /home/.../ttclock/ttcron.sh -r in
+0,30 16-17 * * 1-5 /home/.../ttclock/ttcron.sh -r --ntfy auto-out   # Clock out
 ```
 
 ## Notes

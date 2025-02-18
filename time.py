@@ -351,35 +351,57 @@ def handle_interrupt(automation=None):
     sys.exit(0)
 
 if __name__ == "__main__":
+    # Get the full command that was executed
     command = f"Command executed: {sys.executable} {' '.join(sys.argv)}"
 
     parser = argparse.ArgumentParser(description='Time tracking automation')
-    parser.add_argument('action', nargs='?', choices=['in', 'out', 'switch', 'status', 'auto-out'],
-                       default='status',
-                       help='Specify action: "in" to clock in, "out" to clock out, "switch" to toggle, "status" to check (default), "auto-out" for auto clock-out')
     parser.add_argument('-q', '--quiet', action='store_true',
-                       help='Force disable notifications')
+                        help='Force disable notifications')
     parser.add_argument('-n', '--ntfy', action='store_true',
-                       help='Enable notifications')
+                        help='Enable notifications')
     parser.add_argument('-v', '--verbose', action='count', default=0,
-                       help='Increase verbosity (can be used up to three times: -v, -vv, or -vvv)')
-    parser.add_argument('-r', '--random-delay', type=float, nargs=2, metavar=('MIN', 'MAX'),
-                       help='Random delay between MIN and MAX minutes before action')
+                        help='Increase verbosity (can be used up to three times: -v, -vv, or -vvv)')
+    parser.add_argument('-r', '--random-delay', nargs='*', default=None, metavar=('MIN', 'MAX'),
+                        help='Random delay between MIN and MAX minutes before action (defaults to 0 5 if flag present with no values)')
     parser.add_argument('--env-file', type=str,
-                       help='Path to custom .env file to load environment variables from')
+                        help='Path to custom .env file to load environment variables from')
+    parser.add_argument('action', nargs='?', choices=['in', 'out', 'switch', 'status', 'auto-out'],
+                        default='status',
+                        help='Specify action: "in" to clock in, "out" to clock out, "switch" to toggle, "status" to check (default), "auto-out" for auto clock-out')
 
     args = parser.parse_args()
     setup_logging(args.verbose)
 
+    # Log the command after setting up logging
     logger.info(command)
-    load_environment(args.env_file)
+
+    # Handle random delay defaults
+    if args.random_delay is not None:
+        if args.random_delay == []:  # -r with no values
+            args.random_delay = [0, 5]
+        else:
+            # Filter out non-numeric values and ensure we have at most 2
+            numeric_values = []
+            for val in args.random_delay:
+                try:
+                    numeric_values.append(float(val))
+                except ValueError:
+                    break  # Stop at first non-numeric value (likely the action)
+            if len(numeric_values) == 0:
+                args.random_delay = [0, 5]  # Default if no valid numbers
+            elif len(numeric_values) != 2:
+                parser.error("--random-delay requires exactly 2 numeric arguments (MIN MAX) when values are provided")
+            else:
+                args.random_delay = numeric_values
 
     automation = None
 
     try:
+        # Set up signal handler for graceful shutdown
         automation = TimeCheckAutomation(quiet=args.quiet or not args.ntfy)
         signal.signal(signal.SIGINT, lambda signum, frame: handle_interrupt(automation))
 
+        # Handle random delay if specified
         if args.random_delay:
             min_delay, max_delay = args.random_delay
             delay_secs = random.uniform(min_delay * 60, max_delay * 60)
@@ -394,10 +416,12 @@ if __name__ == "__main__":
             time_info = automation.run()
             print(json.dumps(time_info, indent=2), file=sys.stdout)
         elif args.action == 'auto-out':
+            # For auto-out, create automation with notifications disabled
             quiet_automation = TimeCheckAutomation(quiet=True)
             time_info = quiet_automation.run()
             
             if time_info.get('time_left') == "00:00:00" and time_info.get('status') != "Clocked Out":
+                # Time is out and we need to clock out - use the real automation object
                 automation.run_clock_action("out")
                 logger.info("Auto clock-out completed successfully")
             else:
