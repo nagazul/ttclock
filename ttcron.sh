@@ -1,6 +1,15 @@
 #!/bin/bash
 
-LOGFILE="$HOME/.ttcron.log"
+LOGFILE="$HOME/.log/ttcron.log"
+
+# Extract the directory path from the LOGFILE variable
+LOGDIR=$(dirname "$LOGFILE")
+
+# Check if the directory exists, if not, create it
+if [ ! -d "$LOGDIR" ]; then
+    mkdir -p "$LOGDIR"
+    echo "Directory $LOGDIR created."
+fi
 
 # Get the script's directory
 TTPATH=$(dirname "$(realpath "$0")")
