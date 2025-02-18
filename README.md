@@ -88,6 +88,8 @@ uv run time.py -q                 # Force quiet mode (overrides -n)
 
 uv run time.py switch -r 1 5      # Random delay between 1-5 minutes before switch
 
+uv run time.py --env-file .env    # Custom .env file (also works with ttcron.sh)
+
 # Verbosity levels (can be combined with any command):
 uv run time.py -v                 # Basic operational messages
 uv run time.py -vv                # Detailed operation messages
