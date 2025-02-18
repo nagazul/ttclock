@@ -408,12 +408,19 @@ if __name__ == "__main__":
             time_info = automation.run()
             print(json.dumps(time_info, indent=2), file=sys.stdout)
         elif args.action == 'auto-out':
-            time_info = automation.run()
+            # For auto-out, create automation with notifications disabled
+            # We'll only enable notifications if we actually need to clock out
+            quiet_automation = TimeCheckAutomation(quiet=True)
+            time_info = quiet_automation.run()
+            
             if time_info.get('time_left') == "00:00:00" and time_info.get('status') != "Clocked Out":
+                # Time is out and we need to clock out - now we use the real automation object
+                # with notifications as configured by command line arguments
                 automation.run_clock_action("out")
+                logger.info("Auto clock-out completed successfully")
             else:
-                logger.info("No action needed.")
-                print("No action needed.", file=sys.stdout)
+                # No action needed, just log without notification
+                logger.info("Auto-out not needed: either already clocked out or time remaining")
         else:
             automation.run_clock_action(args.action)
     except KeyboardInterrupt:
