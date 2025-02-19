@@ -2,14 +2,14 @@
 
 # ttcron.sh - Time tracking automation wrapper for cron jobs
 # Usage: ttcron.sh [OPTIONS] {in|out|auto-out}
-# See time.py --help for full options list
 
 # Configuration
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly LOGFILE="${HOME}/.log/ttcron.log"
+readonly MAX_LOG_SIZE=$((10 * 1024 * 1024))  # 10MB
 
-# Ensure log directory exists
-ensure_log_dir() {
+# Ensure log directory exists and rotate log if needed
+prepare_logging() {
     local log_dir=$(dirname "$LOGFILE")
     if [ ! -d "$log_dir" ]; then
         mkdir -p "$log_dir" || {
@@ -17,42 +17,63 @@ ensure_log_dir() {
             exit 2
         }
     fi
+    
+    # Rotate log if it exceeds maximum size
+    if [ -f "$LOGFILE" ] && [ $(stat -c%s "$LOGFILE" 2>/dev/null || echo 0) -gt $MAX_LOG_SIZE ]; then
+        mv "$LOGFILE" "${LOGFILE}.old"
+    fi
 }
 
 # Execute time.py with provided arguments
 run_time() {
-    # Change to the script directory first
+    # Change to the script directory
     cd "$SCRIPT_DIR" || {
-        echo "Error: Failed to change to script directory: $SCRIPT_DIR" >&2
-        exit 3
+        echo "Error: Failed to change to script directory: $SCRIPT_DIR" >> "$LOGFILE" 2>&1
+        return 3
     }
-    
-    # Log the current directory
-    echo "Working directory: $(pwd)" >> "$LOGFILE"
     
     # Activate virtual environment
-    # shellcheck source=/dev/null
-    source .venv/bin/activate || {
-        echo "Error: Failed to activate virtual environment" >&2
-        exit 4
-    }
+    if [ -f .venv/bin/activate ]; then
+        # shellcheck source=/dev/null
+        source .venv/bin/activate || {
+            echo "Error: Failed to activate virtual environment" >> "$LOGFILE" 2>&1
+            return 4
+        }
+    else
+        echo "Warning: Virtual environment not found at expected location" >> "$LOGFILE" 2>&1
+    fi
     
-    # Log and execute the command with provided arguments as-is
-    echo "Executing: python time.py -vv $*" >> "$LOGFILE"
-    python time.py -vv "$@" >> "$LOGFILE" 2>&1 || {
-        echo "Error: Failed to execute time.py with arguments: $*" >&2
-        exit 1
-    }
+    # Log and execute the command
+    echo "Executing: python time.py $*" >> "$LOGFILE"
+    python time.py "$@" >> "$LOGFILE" 2>&1
+    local exit_code=$?
+    
+    if [ $exit_code -ne 0 ]; then
+        echo "Error: time.py exited with code $exit_code" >> "$LOGFILE" 2>&1
+        return $exit_code
+    fi
+    
+    return 0
 }
 
 # Main execution
 main() {
-    ensure_log_dir
-    echo "-------------------------" >> "$LOGFILE"
-    echo "Starting ttcron.sh at $(date)" >> "$LOGFILE"
-    run_time "$@"
-    echo "Completed ttcron.sh at $(date)" >> "$LOGFILE"
-    echo "-------------------------" >> "$LOGFILE"
+    prepare_logging
+    
+    {
+        echo "-------------------------"
+        echo "Starting ttcron.sh at $(date)"
+        echo "User: $(whoami)"
+        echo "Working directory: $SCRIPT_DIR"
+        
+        run_time "$@"
+        local result=$?
+        
+        echo "Completed ttcron.sh at $(date) with exit code: $result"
+        echo "-------------------------"
+    } >> "$LOGFILE" 2>&1
+    
+    exit $result
 }
 
 # Execute with all arguments
