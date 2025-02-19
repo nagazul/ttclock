@@ -427,43 +427,27 @@ if __name__ == "__main__":
 
     # Log the command after setting up logging
     logger.info(command)
+    
+    # Load environment variables BEFORE creating the automation instance
+    load_environment(args.env_file)
 
-    # Handle random delay defaults
-    if args.random_delay is not None:
-        if args.random_delay == []:  # -r with no values
-            args.random_delay = [0, 5]
-        else:
-            # Filter out non-numeric values and ensure we have at most 2
-            numeric_values = []
-            for val in args.random_delay:
-                try:
-                    numeric_values.append(float(val))
-                except ValueError:
-                    break  # Stop at first non-numeric value (likely the action)
-            if len(numeric_values) == 0:
-                args.random_delay = [0, 5]  # Default if no valid numbers
-            elif len(numeric_values) != 2:
-                parser.error("--random-delay requires exactly 2 numeric arguments (MIN MAX) when values are provided")
-            else:
-                args.random_delay = numeric_values
+    # Handle random delay if specified
+    if args.random_delay:
+        min_delay, max_delay = args.random_delay
+        delay_secs = random.uniform(min_delay * 60, max_delay * 60)
+        if not args.quiet:
+            print(f"Waiting {delay_secs/60:.2f} minutes...", file=sys.stderr)
+        try:
+            time.sleep(delay_secs)
+        except KeyboardInterrupt:
+            handle_interrupt(None)
 
     automation = None
-
     try:
-        # Set up signal handler for graceful shutdown
+        # Create automation AFTER loading environment variables
         automation = TimeCheckAutomation(quiet=args.quiet or not args.ntfy)
+        # Set up signal handler for graceful shutdown
         signal.signal(signal.SIGINT, lambda signum, frame: handle_interrupt(automation))
-
-        # Handle random delay if specified
-        if args.random_delay:
-            min_delay, max_delay = args.random_delay
-            delay_secs = random.uniform(min_delay * 60, max_delay * 60)
-            if not args.quiet:
-                print(f"Waiting {delay_secs/60:.2f} minutes...", file=sys.stderr)
-            try:
-                time.sleep(delay_secs)
-            except KeyboardInterrupt:
-                handle_interrupt(automation)
 
         if args.action == 'status':
             time_info = automation.run()
