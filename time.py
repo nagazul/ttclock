@@ -18,13 +18,24 @@ from selenium.webdriver.chrome.service import Service
 from dotenv import load_dotenv
 import requests
 from datetime import datetime
+import hashlib
 
-# [Previous logging setup and environment loading functions remain unchanged]
 def setup_logging(verbosity=0):
+    pid = os.getpid()
+
+    if 'TTCRON_SESSION_ID' in os.environ:
+        session_id = os.environ.get('TTCRON_SESSION_ID')
+    else:
+        # Generate a session ID similar to the bash version
+        current_time = str(time.time()).encode('utf-8')
+        session_id = hashlib.md5(current_time).hexdigest()[:8]
+
+    log_format = f'[Session {session_id} PID {pid}] %(asctime)s - %(levelname)s - %(message)s'
+    
     root_logger = logging.getLogger()
     root_logger.setLevel(logging.ERROR)
     handler = logging.StreamHandler(sys.stderr)
-    handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+    handler.setFormatter(logging.Formatter(log_format))
     root_logger.addHandler(handler)
 
     script_logger = logging.getLogger(__name__)
@@ -63,7 +74,6 @@ def load_environment(env_file=None):
             sys.exit(1)
     load_dotenv()
 
-# [TimeCheckAutomation class remains unchanged]
 class TimeCheckAutomation:
     def __init__(self, quiet=True):
         self.url = os.getenv('TIMETRACKING_URL')

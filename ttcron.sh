@@ -58,18 +58,20 @@ run_time() {
 
 # Main execution
 main() {
-    prepare_logging
+    session_id=$(date +%s%N | md5sum | head -c 8)
+    export TTCRON_SESSION_ID=$session_id
     
     {
         echo "-------------------------"
-        echo "Starting ttcron.sh at $(date)"
-        echo "User: $(whoami)"
-        echo "Working directory: $SCRIPT_DIR"
+        echo "[Session $session_id PID $$] Starting ttcron.sh at $(date)"
+        echo "[Session $session_id PID $$] User: $(whoami)"
+        echo "[Session $session_id PID $$] Working directory: $SCRIPT_DIR"
+        echo "[Session $session_id PID $$] Executing: python time.py $*"
         
         run_time "$@"
         local result=$?
         
-        echo "Completed ttcron.sh at $(date) with exit code: $result"
+        echo "[Session $session_id PID $$] Completed ttcron.sh at $(date) with exit code: $result"
         echo "-------------------------"
     } >> "$LOGFILE" 2>&1
     
