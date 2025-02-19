@@ -67,14 +67,14 @@ main() {
     
     {
         echo "-------------------------"
-        echo "[XID $XID PID $$] Starting ttcron.sh at $(date)"
-        echo "[XID $XID PID $$] User: $(whoami)"
-        echo "[XID $XID PID $$] Working directory: $SCRIPT_DIR"
+        echo "[XID:$XID PID:$$] Starting ttcron.sh at $(date)"
+        echo "[XID:$XID PID:$$] User: $(whoami)"
+        echo "[XID:$XID PID:$$] Working directory: $SCRIPT_DIR"
         
         run_time "$@"
         local result=$?
         
-        echo "[XID $XID PID $$] Completed ttcron.sh at $(date) with exit code: $result"
+        echo "[XID:$XID PID:$$] Completed ttcron.sh at $(date) with exit code: $result"
         echo "-------------------------"
     } >> "$LOGFILE" 2>&1
     

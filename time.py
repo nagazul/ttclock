@@ -30,7 +30,7 @@ def setup_logging(verbosity=0):
         current_time = str(time.time()).encode('utf-8')
         xid = hashlib.md5(current_time).hexdigest()[:8]
 
-    log_format = f'[XID {xid} PID {pid}] %(asctime)s - %(levelname)s - %(message)s'
+    log_format = f'[XID:{xid} PID:{pid}] %(asctime)s - %(levelname)s - %(message)s'
     
     root_logger = logging.getLogger()
     root_logger.setLevel(logging.ERROR)
