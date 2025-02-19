@@ -44,12 +44,12 @@ run_time() {
     fi
     
     # Log and execute the command
-    echo "Executing: python time.py $*" >> "$LOGFILE"
+    echo "[Session $XID PID $$] Executing: python time.py $*" >> "$LOGFILE"
     python time.py "$@" >> "$LOGFILE" 2>&1
     local exit_code=$?
     
     if [ $exit_code -ne 0 ]; then
-        echo "Error: time.py exited with code $exit_code" >> "$LOGFILE" 2>&1
+        echo "[Session $XID PID $$] Error: time.py exited with code $exit_code" >> "$LOGFILE" 2>&1
         return $exit_code
     fi
     
@@ -58,20 +58,23 @@ run_time() {
 
 # Main execution
 main() {
-    session_id=$(date +%s%N | md5sum | head -c 8)
-    export TTCRON_SESSION_ID=$session_id
+    prepare_logging
+    
+    # Generate session ID if not already set
+    if [ -z "${XID:-}" ]; then
+        export XID=$(date +%s%N | md5sum | head -c 8)
+    fi
     
     {
         echo "-------------------------"
-        echo "[Session $session_id PID $$] Starting ttcron.sh at $(date)"
-        echo "[Session $session_id PID $$] User: $(whoami)"
-        echo "[Session $session_id PID $$] Working directory: $SCRIPT_DIR"
-        echo "[Session $session_id PID $$] Executing: python time.py $*"
+        echo "[XID $XID PID $$] Starting ttcron.sh at $(date)"
+        echo "[XID $XID PID $$] User: $(whoami)"
+        echo "[XID $XID PID $$] Working directory: $SCRIPT_DIR"
         
         run_time "$@"
         local result=$?
         
-        echo "[Session $session_id PID $$] Completed ttcron.sh at $(date) with exit code: $result"
+        echo "[XID $XID PID $$] Completed ttcron.sh at $(date) with exit code: $result"
         echo "-------------------------"
     } >> "$LOGFILE" 2>&1
     

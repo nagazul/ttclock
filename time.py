@@ -23,14 +23,14 @@ import hashlib
 def setup_logging(verbosity=0):
     pid = os.getpid()
 
-    if 'TTCRON_SESSION_ID' in os.environ:
-        session_id = os.environ.get('TTCRON_SESSION_ID')
+    if 'XID' in os.environ:
+        xid = os.environ.get('XID')
     else:
         # Generate a session ID similar to the bash version
         current_time = str(time.time()).encode('utf-8')
-        session_id = hashlib.md5(current_time).hexdigest()[:8]
+        xid = hashlib.md5(current_time).hexdigest()[:8]
 
-    log_format = f'[Session {session_id} PID {pid}] %(asctime)s - %(levelname)s - %(message)s'
+    log_format = f'[XID {xid} PID {pid}] %(asctime)s - %(levelname)s - %(message)s'
     
     root_logger = logging.getLogger()
     root_logger.setLevel(logging.ERROR)
