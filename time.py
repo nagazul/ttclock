@@ -105,47 +105,100 @@ class TimeCheckAutomation:
         except Exception as e:
             logger.error(f"Failed to send notification: {str(e)}")
 
-    def setup_driver(self):
-        """Configure and initialize the Chrome WebDriver"""
-        logger.debug("Setting up Chrome options...")
-        chrome_options = Options()
-        chrome_options.add_argument("--disable-infobars")
-        chrome_options.add_argument("--start-maximized")
-        chrome_options.add_argument("--incognito")
-        chrome_options.add_argument("--headless=new")
-        chrome_options.add_argument("--disable-gpu")
-        chrome_options.add_argument("--no-sandbox")
-        chrome_options.add_argument("--disable-dev-shm-usage")
+    def setup_driver(self, max_retries=3, retry_delay=5):
+        """Configure and initialize the Chrome WebDriver with retry mechanism"""
+        retry_count = 0
+        last_exception = None
+        
+        while retry_count < max_retries:
+            try:
+                logger.debug(f"Setting up Chrome options (attempt {retry_count + 1}/{max_retries})...")
+                chrome_options = Options()
+                chrome_options.add_argument("--disable-infobars")
+                chrome_options.add_argument("--start-maximized")
+                chrome_options.add_argument("--incognito")
+                chrome_options.add_argument("--headless")  # Using older headless flag
+                chrome_options.add_argument("--disable-gpu")
+                chrome_options.add_argument("--no-sandbox")
+                chrome_options.add_argument("--disable-dev-shm-usage")
+                chrome_options.add_argument("--disable-extensions")
+                chrome_options.add_argument("--dns-prefetch-disable")
+                
+                # Check for X11 display availability and adjust settings
+                if "DISPLAY" not in os.environ or not os.environ["DISPLAY"]:
+                    logger.debug("No display detected, configuring for headless environment")
+                    chrome_options.add_argument("--disable-dev-shm-usage")
+                    chrome_options.add_argument("--disable-software-rasterizer")
+                
+                # Check for Chrome binary locations
+                logger.debug("Checking for Chrome binary locations...")
+                chrome_paths = [
+                    '/usr/bin/google-chrome',
+                    '/usr/bin/google-chrome-stable',
+                    '/usr/bin/chromium',
+                    '/usr/bin/chromium-browser'
+                ]
 
-        logger.debug("Checking for Chrome binary locations...")
-        chrome_paths = [
-            '/usr/bin/google-chrome',
-            '/usr/bin/google-chrome-stable',
-            '/usr/bin/chromium',
-            '/usr/bin/chromium-browser'
-        ]
+                chrome_binary = None
+                for path in chrome_paths:
+                    logger.debug(f"Checking path: {path}")
+                    if os.path.exists(path):
+                        chrome_binary = path
+                        break
 
-        chrome_binary = None
-        for path in chrome_paths:
-            logger.debug(f"Checking path: {path}")
-            if os.path.exists(path):
-                chrome_binary = path
-                break
+                if chrome_binary:
+                    chrome_options.binary_location = chrome_binary
+                    logger.info(f"Using Chrome binary at: {chrome_binary}")
+                    
+                    # Try to get Chrome version for matching ChromeDriver
+                    try:
+                        chrome_version = os.popen(f'"{chrome_binary}" --version').read().strip().split()[2]
+                        logger.info(f"Detected Chrome version: {chrome_version}")
+                        service = Service(ChromeDriverManager(version=chrome_version.split('.')[0]).install())
+                    except Exception as e:
+                        logger.warning(f"Could not determine Chrome version: {e}")
+                        service = Service(ChromeDriverManager().install())
+                else:
+                    logger.warning("Could not find Chrome binary in common locations")
+                    service = Service(ChromeDriverManager().install())
 
-        if chrome_binary:
-            chrome_options.binary_location = chrome_binary
-            logger.info(f"Using Chrome binary at: {chrome_binary}")
-        else:
-            logger.warning("Could not find Chrome binary in common locations")
-
-        logger.debug("Setting up ChromeDriver service...")
-        service = Service(ChromeDriverManager().install())
-
-        logger.debug("Initializing Chrome WebDriver...")
-        self.driver = webdriver.Chrome(service=service, options=chrome_options)
-        self.driver.set_window_size(1920, 1080)
-        logger.debug("Setting up WebDriverWait with 30 second timeout...")
-        self.wait = WebDriverWait(self.driver, 30)
+                logger.debug("Initializing Chrome WebDriver...")
+                self.driver = webdriver.Chrome(service=service, options=chrome_options)
+                self.driver.set_window_size(1920, 1080)
+                
+                # Set explicit timeouts
+                self.driver.set_page_load_timeout(60)
+                self.driver.set_script_timeout(60)
+                
+                logger.debug("Setting up WebDriverWait with 30 second timeout...")
+                self.wait = WebDriverWait(self.driver, 30)
+                
+                # If we get here, initialization was successful
+                return
+                
+            except WebDriverException as e:
+                last_exception = e
+                retry_count += 1
+                logger.warning(f"WebDriver initialization failed (attempt {retry_count}/{max_retries}): {str(e)}")
+                
+                # Clean up failed driver instance if it exists
+                if hasattr(self, 'driver') and self.driver:
+                    try:
+                        self.driver.quit()
+                    except:
+                        pass
+                    self.driver = None
+                    
+                if retry_count < max_retries:
+                    sleep_time = retry_delay * retry_count  # Increasing backoff
+                    logger.info(f"Retrying in {sleep_time} seconds...")
+                    time.sleep(sleep_time)
+                else:
+                    logger.error(f"Failed to initialize WebDriver after {max_retries} attempts")
+                    raise last_exception
+        
+        # This should never be reached due to the raise in the loop
+        raise RuntimeError("Unexpected error in WebDriver initialization")
 
     def login(self):
         """Handle the login process"""
