@@ -19,7 +19,7 @@ from dotenv import load_dotenv
 import requests
 from datetime import datetime
 
-# Configure logging
+# [Previous logging setup and environment loading functions remain unchanged]
 def setup_logging(verbosity=0):
     root_logger = logging.getLogger()
     root_logger.setLevel(logging.ERROR)
@@ -52,7 +52,6 @@ def setup_logging(verbosity=0):
 
 logger = logging.getLogger(__name__)
 
-# Load environment variables
 def load_environment(env_file=None):
     """Load environment variables from a custom .env file if specified, then from default .env"""
     if env_file:
@@ -62,8 +61,9 @@ def load_environment(env_file=None):
         else:
             logger.error(f"Custom environment file not found: {env_file}")
             sys.exit(1)
-    load_dotenv()  # Load default .env file (if exists) after custom one
+    load_dotenv()
 
+# [TimeCheckAutomation class remains unchanged]
 class TimeCheckAutomation:
     def __init__(self, quiet=True):
         self.url = os.getenv('TIMETRACKING_URL')
@@ -124,13 +124,11 @@ class TimeCheckAutomation:
                 chrome_options.add_argument("--disable-extensions")
                 chrome_options.add_argument("--dns-prefetch-disable")
                 
-                # Check for X11 display availability and adjust settings
                 if "DISPLAY" not in os.environ or not os.environ["DISPLAY"]:
                     logger.debug("No display detected, configuring for headless environment")
                     chrome_options.add_argument("--disable-dev-shm-usage")
                     chrome_options.add_argument("--disable-software-rasterizer")
                 
-                # Check for Chrome binary locations
                 logger.debug("Checking for Chrome binary locations...")
                 chrome_paths = [
                     '/usr/bin/google-chrome',
@@ -150,7 +148,6 @@ class TimeCheckAutomation:
                     chrome_options.binary_location = chrome_binary
                     logger.info(f"Using Chrome binary at: {chrome_binary}")
                     
-                    # Try to get Chrome version for matching ChromeDriver
                     try:
                         chrome_version = os.popen(f'"{chrome_binary}" --version').read().strip().split()[2]
                         logger.info(f"Detected Chrome version: {chrome_version}")
@@ -166,14 +163,12 @@ class TimeCheckAutomation:
                 self.driver = webdriver.Chrome(service=service, options=chrome_options)
                 self.driver.set_window_size(1920, 1080)
                 
-                # Set explicit timeouts
                 self.driver.set_page_load_timeout(60)
                 self.driver.set_script_timeout(60)
                 
                 logger.debug("Setting up WebDriverWait with 30 second timeout...")
                 self.wait = WebDriverWait(self.driver, 30)
                 
-                # If we get here, initialization was successful
                 return
                 
             except WebDriverException as e:
@@ -181,7 +176,6 @@ class TimeCheckAutomation:
                 retry_count += 1
                 logger.warning(f"WebDriver initialization failed (attempt {retry_count}/{max_retries}): {str(e)}")
                 
-                # Clean up failed driver instance if it exists
                 if hasattr(self, 'driver') and self.driver:
                     try:
                         self.driver.quit()
@@ -190,14 +184,13 @@ class TimeCheckAutomation:
                     self.driver = None
                     
                 if retry_count < max_retries:
-                    sleep_time = retry_delay * retry_count  # Increasing backoff
+                    sleep_time = retry_delay * retry_count
                     logger.info(f"Retrying in {sleep_time} seconds...")
                     time.sleep(sleep_time)
                 else:
                     logger.error(f"Failed to initialize WebDriver after {max_retries} attempts")
                     raise last_exception
         
-        # This should never be reached due to the raise in the loop
         raise RuntimeError("Unexpected error in WebDriver initialization")
 
     def login(self):
@@ -403,10 +396,8 @@ def handle_interrupt(automation=None):
         automation.cleanup()
     sys.exit(0)
 
-if __name__ == "__main__":
-    # Get the full command that was executed
-    command = f"Command executed: {sys.executable} {' '.join(sys.argv)}"
-
+def parse_arguments():
+    """Parse command line arguments"""
     parser = argparse.ArgumentParser(description='Time tracking automation')
     parser.add_argument('-q', '--quiet', action='store_true',
                         help='Force disable notifications')
@@ -418,22 +409,91 @@ if __name__ == "__main__":
                         help='Random delay between MIN and MAX minutes before action (defaults to 0 5 if flag present with no values)')
     parser.add_argument('--env-file', type=str,
                         help='Path to custom .env file to load environment variables from')
-    parser.add_argument('action', nargs='?', choices=['in', 'out', 'switch', 'status', 'auto-out'],
-                        default='status',
-                        help='Specify action: "in" to clock in, "out" to clock out, "switch" to toggle, "status" to check (default), "auto-out" for auto clock-out')
+    parser.add_argument('--action', dest='explicit_action',
+                        choices=['in', 'out', 'switch', 'status', 'auto-out'],
+                        help='Specify action: "in" to clock in, "out" to clock out, "switch" to toggle, "status" to check, "auto-out" for auto clock-out')
 
-    args = parser.parse_args()
-    setup_logging(args.verbose)
-
-    # Log the command after setting up logging
-    logger.info(command)
+    custom_args = sys.argv[1:]
+    i = 0
+    delay_params = []
     
-    # Load environment variables BEFORE creating the automation instance
-    load_environment(args.env_file)
+    while i < len(custom_args):
+        if custom_args[i] in ['-r', '--random-delay']:
+            if i+1 >= len(custom_args) or custom_args[i+1].startswith('-') or custom_args[i+1] in ['in', 'out', 'switch', 'status', 'auto-out']:
+                pass
+            else:
+                for j in range(1, 3):
+                    if i+j < len(custom_args) and not custom_args[i+j].startswith('-') and custom_args[i+j] not in ['in', 'out', 'switch', 'status', 'auto-out']:
+                        try:
+                            float(custom_args[i+j])
+                            delay_params.append(custom_args[i+j])
+                        except ValueError:
+                            break
+                    else:
+                        break
+        i += 1
+    
+    known_args, remaining = parser.parse_known_args()
+    
+    action = None
+    valid_actions = ['in', 'out', 'switch', 'status', 'auto-out']
+    clean_remaining = []
+    
+    for arg in remaining:
+        if arg in valid_actions:
+            action = arg
+        elif not (arg in delay_params):
+            clean_remaining.append(arg)
+    
+    if known_args.explicit_action:
+        action = known_args.explicit_action
+    elif action is None:
+        action = 'status'
+    
+    if clean_remaining:
+        parser.error(f"Unrecognized arguments: {' '.join(clean_remaining)}")
+    
+    args = known_args
+    args.action = action
+    
+    if known_args.random_delay is not None and not delay_params:
+        args.random_delay = []
+    
+    return args
 
-    # Handle random delay if specified
-    if args.random_delay:
-        min_delay, max_delay = args.random_delay
+def process_random_delay(args):
+    """Process random delay parameters"""
+    if args.random_delay is None:
+        return None
+        
+    if len(args.random_delay) == 0:
+        return (0, 5)
+    elif len(args.random_delay) == 1:
+        try:
+            min_delay = float(args.random_delay[0])
+            return (min_delay, min_delay + 5)
+        except ValueError:
+            raise argparse.ArgumentTypeError("--random-delay values must be numbers")
+    else:
+        try:
+            min_delay, max_delay = map(float, args.random_delay[:2])
+            return (min_delay, max_delay)
+        except ValueError:
+            raise argparse.ArgumentTypeError("--random-delay values must be numbers")
+
+def main(args=None):
+    """Main execution function"""
+    if args is None:
+        args = parse_arguments()
+
+    command = f"Command executed: {sys.executable} {' '.join(sys.argv)}"
+    setup_logging(args.verbose)
+    logger.info(command)
+    load_environment(args.env_file)
+    
+    random_delay = process_random_delay(args)
+    if random_delay:
+        min_delay, max_delay = random_delay
         delay_secs = random.uniform(min_delay * 60, max_delay * 60)
         if not args.quiet:
             print(f"Waiting {delay_secs/60:.2f} minutes...", file=sys.stderr)
@@ -441,30 +501,25 @@ if __name__ == "__main__":
             time.sleep(delay_secs)
         except KeyboardInterrupt:
             handle_interrupt(None)
-
+    
     automation = None
     try:
-        # Create automation AFTER loading environment variables
         automation = TimeCheckAutomation(quiet=args.quiet or not args.ntfy)
-        # Set up signal handler for graceful shutdown
         signal.signal(signal.SIGINT, lambda signum, frame: handle_interrupt(automation))
-
+        
         if args.action == 'status':
             time_info = automation.run()
             print(json.dumps(time_info, indent=2), file=sys.stdout)
         elif args.action == 'auto-out':
-            # For auto-out, create automation with notifications disabled
             quiet_automation = TimeCheckAutomation(quiet=True)
             time_info = quiet_automation.run()
-            
             if time_info.get('time_left') == "00:00:00" and time_info.get('status') != "Clocked Out":
-                # Time is out and we need to clock out - use the real automation object
                 automation.run_clock_action("out")
                 logger.info("Auto clock-out completed successfully")
             else:
                 logger.info("Auto-out not needed: either already clocked out or time remaining")
         else:
-            automation.run_clock_action(args.action)
+            automation.run_clock_action(args.action, random_delay)
     except KeyboardInterrupt:
         handle_interrupt(automation)
     except Exception as e:
@@ -472,3 +527,6 @@ if __name__ == "__main__":
         if automation:
             automation.cleanup()
         sys.exit(1)
+
+if __name__ == "__main__":
+    main()
