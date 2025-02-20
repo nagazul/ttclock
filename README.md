@@ -106,12 +106,15 @@ uv run time.py -n -q              # -q overrides -n, runs in quiet mode
 ```
 
 ## Cron
-ttcron.sh logs in ~/.log/ttcron.log
+ttcron.sh logs in ~/.log/ttcron.log  
+Multiple clock in times to catch one if your laptop is down...  
+Multiple clock out times to make sure you clock out when the working time is over.    
+ntfy only notifies when the status changes.  
 
 ```
-50 07 * * 1-5 /home/.../ttclock/ttcron.sh -r in --ntfy              # Clock in
-10 13 * * 1-5 /home/.../ttclock/ttcron.sh -r out                    # nap
-00 14 * * 1-5 /home/.../ttclock/ttcron.sh -r in                     # nap.
+15,45 06-07 * * 1-5 /home/.../ttclock/ttcron.sh -r --ntfy in        # Clock in
+10,15 13 * * 1-5 /home/.../ttclock/ttcron.sh -r out                 # nap
+25,30 14 * * 1-5 /home/.../ttclock/ttcron.sh -r in                  # nap.
 0,30 16-17 * * 1-5 /home/.../ttclock/ttcron.sh -r --ntfy auto-out   # Clock out
 ```
 
