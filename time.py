@@ -375,16 +375,9 @@ class TimeCheckAutomation:
                 self.driver.quit()
                 logger.info("Browser session closed")
 
-    def run_clock_action(self, action='switch', random_delay=None):
+    def run_clock_action(self, action='switch'):
         """Run clock in/out action"""
         try:
-            if random_delay:
-                min_delay, max_delay = random_delay
-                delay = random.uniform(min_delay * 60, max_delay * 60)
-                delay_min = delay / 60
-                logger.info(f"Random delay activated: waiting {delay_min:.2f} minutes...")
-                time.sleep(delay)
-
             self.setup_driver()
             self.login()
             self.handle_time_tracking(action)
@@ -529,7 +522,7 @@ def main(args=None):
             else:
                 logger.info("Auto-out not needed: either already clocked out or time remaining")
         else:
-            automation.run_clock_action(args.action, random_delay)
+            automation.run_clock_action(args.action)
     except KeyboardInterrupt:
         handle_interrupt(automation)
     except Exception as e:
