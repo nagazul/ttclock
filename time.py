@@ -6,6 +6,8 @@ import random
 import time
 import signal
 import logging
+import socket
+import getpass
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.action_chains import ActionChains
@@ -30,12 +32,48 @@ def setup_logging(verbosity=0):
         current_time = str(time.time()).encode('utf-8')
         xid = hashlib.md5(current_time).hexdigest()[:8]
 
-    log_format = f'[XID:{xid} PID:{pid}] %(asctime)s - %(levelname)s - %(message)s'
+    # Format with ISO 8601 timestamp including milliseconds and timezone
+    log_format = f'[XID:{xid} PID:{pid}] %(asctime)s [%(levelname)-5s] [%(hostname)s] [%(username)s] - %(message)s'
+    
+    # Create a filter to add hostname and username
+    class ContextFilter(logging.Filter):
+        def filter(self, record):
+            record.hostname = os.environ.get('HOSTNAME', 
+                                           socket.gethostname().split('.')[0] if hasattr(socket, 'gethostname') else 'unknown')
+            record.username = os.environ.get('USER', 
+                                          getpass.getuser() if hasattr(getpass, 'getuser') else 'unknown')
+            return True
+    
+    # Custom formatter that adds timezone and millisecond precision
+    class ISOFormatter(logging.Formatter):
+        def formatTime(self, record, datefmt=None):
+            ct = self.converter(record.created)
+            # Get timezone offset
+            if time.localtime().tm_isdst:
+                tz_offset = time.altzone
+            else:
+                tz_offset = time.timezone
+            # Convert to hours and minutes with sign
+            tz_hours, tz_minutes = divmod(abs(tz_offset) // 60, 60)
+            tz_sign = '+' if tz_offset <= 0 else '-'  # tz_offset is seconds west of UTC
+            
+            # Format time with milliseconds
+            t = time.strftime('%Y-%m-%dT%H:%M:%S', ct)
+            msec = int(record.msecs)
+            return f"{t}.{msec:03d}{tz_sign}{tz_hours:02d}{tz_minutes:02d}"
+    
+    # Create custom formatter
+    formatter = ISOFormatter(log_format)
     
     root_logger = logging.getLogger()
     root_logger.setLevel(logging.ERROR)
     handler = logging.StreamHandler(sys.stderr)
-    handler.setFormatter(logging.Formatter(log_format))
+    handler.setFormatter(formatter)
+    
+    # Add the context filter
+    context_filter = ContextFilter()
+    handler.addFilter(context_filter)
+    
     root_logger.addHandler(handler)
 
     script_logger = logging.getLogger(__name__)
@@ -105,7 +143,13 @@ class TimeCheckAutomation:
         # are created, not whether they're sent once created
         
         try:
-            current_time = datetime.now().strftime('%H:%M:%S')
+            # Update to use ISO 8601 format for notification timestamps
+            now = datetime.now()
+            tz_offset_minutes = now.astimezone().utcoffset().total_seconds() / 60
+            tz_sign = '+' if tz_offset_minutes >= 0 else '-'
+            tz_hours, tz_minutes = divmod(abs(int(tz_offset_minutes)), 60)
+            current_time = f"{now.strftime('%Y-%m-%dT%H:%M:%S')}.{now.microsecond//1000:03d}{tz_sign}{tz_hours:02d}{tz_minutes:02d}"
+            
             data = f"[{current_time}] {message}"
             headers = {
                 "Priority": priority,
@@ -388,17 +432,9 @@ class TimeCheckAutomation:
         try:
             self.setup_driver()
             self.login()
-            # Store time info before sending notification
+            # Store time info WITHOUT sending notification
             time_info = self.get_time_info()
-            # Only send a single notification on successful completion
-            if self.ntfy_topic:
-                status_message = (
-                    f"Status check completed successfully\n"
-                    f"Current status: {time_info['status']}\n" 
-                    f"Time worked: {time_info.get('time_worked', 'N/A')}\n"
-                    f"Time left: {time_info.get('time_left', 'N/A')}"
-                )
-                self.send_notification(status_message, tags=["time", "check"])
+            # Only return the info - let caller decide if notification is needed
             return time_info
         except Exception as e:
             error_msg = f"An error occurred: {str(e)}"
@@ -409,7 +445,7 @@ class TimeCheckAutomation:
             if self.driver:
                 self.driver.quit()
                 logger.info("Browser session closed")
-
+        
     def run_clock_action(self, action='switch'):
         """Run clock in/out action"""
         try:
@@ -546,23 +582,45 @@ def main(args=None):
     
     automation = None
     try:
-        automation = TimeCheckAutomation(quiet=args.quiet or not args.ntfy)
-        signal.signal(signal.SIGINT, lambda signum, frame: handle_interrupt(automation))
-        
         if args.action == 'status':
+            automation = TimeCheckAutomation(quiet=args.quiet or not args.ntfy)
+            signal.signal(signal.SIGINT, lambda signum, frame: handle_interrupt(automation))
             time_info = automation.run()
+            # Only send notification for explicit status check if notifications are enabled
+            if automation.ntfy_topic and args.ntfy:
+                status_message = (
+                    f"Status check completed successfully\n"
+                    f"Current status: {time_info['status']}\n" 
+                    f"Time worked: {time_info.get('time_worked', 'N/A')}\n"
+                    f"Time left: {time_info.get('time_left', 'N/A')}"
+                )
+                automation.send_notification(status_message, tags=["time", "check"])
             print(json.dumps(time_info, indent=2), file=sys.stdout)
         elif args.action == 'auto-out':
-            # Use the same automation instance but first check status quietly
-            time_info = automation.run()
-            if time_info.get('time_left') == "00:00:00" and time_info.get('status') != "Clocked Out":
-                action_performed = automation.handle_time_tracking("out")
-                if action_performed:
-                    logger.info("Auto clock-out completed successfully")
-                    # Notification is sent by handle_time_tracking
-            else:
-                logger.info("Auto-out not needed: either already clocked out or time remaining")
+            # Handle auto-out case differently to prevent browser session closure
+            automation = TimeCheckAutomation(quiet=args.quiet or not args.ntfy)
+            signal.signal(signal.SIGINT, lambda signum, frame: handle_interrupt(automation))
+            try:
+                automation.setup_driver()
+                automation.login()
+                time_info = automation.get_time_info()
+                
+                if time_info.get('time_left') == "00:00:00" and time_info.get('status') != "Clocked Out":
+                    # Use the same browser session to perform the clock out
+                    action_performed = automation.handle_time_tracking("out")
+                    if action_performed:
+                        logger.info("Auto clock-out completed successfully")
+                        # handle_time_tracking already sends notification on success
+                else:
+                    logger.info("Auto-out not needed: either already clocked out or time remaining")
+                    # No notification when no action taken
+            finally:
+                if automation and automation.driver:
+                    automation.driver.quit()
+                    logger.info("Browser session closed")
         else:
+            automation = TimeCheckAutomation(quiet=args.quiet or not args.ntfy)
+            signal.signal(signal.SIGINT, lambda signum, frame: handle_interrupt(automation))
             automation.run_clock_action(args.action)
     except KeyboardInterrupt:
         handle_interrupt(automation)
