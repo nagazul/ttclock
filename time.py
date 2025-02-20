@@ -82,6 +82,7 @@ class TimeCheckAutomation:
         self.ntfy_topic = os.getenv('NTFY_TOPIC', '') if not quiet else ''
         self.driver = None
         self.wait = None
+        self.send_success_notifications_only = True  # New flag to control notification behavior
 
     def cleanup(self):
         """Cleanup resources"""
@@ -92,11 +93,17 @@ class TimeCheckAutomation:
             except Exception as e:
                 logger.error(f"Error during cleanup: {str(e)}")
 
-    def send_notification(self, message, priority='default', tags=None):
-        """Send notification to ntfy.sh if topic is configured"""
+    def send_notification(self, message, priority='default', tags=None, force=False):
+        """Send notification to ntfy.sh if topic is configured
+        The force parameter allows bypassing the success-only restriction for critical notifications
+        """
         if not self.ntfy_topic:
             return
-
+            
+        # Always send success notifications and high priority notifications
+        # The self.send_success_notifications_only flag now controls when notifications
+        # are created, not whether they're sent once created
+        
         try:
             current_time = datetime.now().strftime('%H:%M:%S')
             data = f"[{current_time}] {message}"
@@ -292,20 +299,21 @@ class TimeCheckAutomation:
             )
 
             logger.info(message)
-            self.send_notification(message, tags=["time", "check"])
+            # Don't send notification here - it will be sent by the run method
+            # after this function completes successfully
 
             return {
                 'status': status,
                 'first_clock': times.get('First clock in'),
                 'time_worked': times.get('All for today'),
-                'time_left': times.get('Time left'),
+                'time_left': times.get('Time left'), 
                 'date': times.get('Current Date')
             }
 
         except Exception as e:
             error_msg = f"Error getting time info: {str(e)}"
             logger.error(error_msg)
-            self.send_notification(error_msg, priority="high", tags=["time", "error"])
+            self.send_notification(error_msg, priority="high", tags=["time", "error"], force=True)
             raise
 
     def handle_time_tracking(self, action='switch'):
@@ -334,29 +342,45 @@ class TimeCheckAutomation:
             if should_clock_in and is_clocked_in:
                 msg = "Already clocked in"
                 logger.info(msg)
-                self.send_notification(msg, tags=["clock", "info"])
-                return
+                # No notification sent for no-op operations
+                return False
             elif not should_clock_in and not is_clocked_in:
                 msg = "Already clocked out"
                 logger.info(msg)
-                self.send_notification(msg, tags=["clock", "info"])
-                return
+                # No notification sent for no-op operations  
+                return False
 
+            action_name = "Clock In" if should_clock_in else "Clock Out"
+            logger.info(f"Performing {action_name}")
+            
             if should_clock_in:
-                msg = "Performing Clock In"
-                logger.info(msg)
-                self.send_notification(msg, tags=["clock", "in"])
                 ActionChains(self.driver).move_to_element(clock_in_button).click().perform()
+                # Get the latest time info for the notification
+                time_info = self.get_time_info()
+                # Send notification after successful completion
+                notification_msg = (
+                    f"Successfully clocked in\n"
+                    f"Time worked today: {time_info.get('time_worked', 'N/A')}\n"
+                    f"Time left: {time_info.get('time_left', 'N/A')}"
+                )
+                self.send_notification(notification_msg, tags=["clock", "in"])
             else:
-                msg = "Performing Clock Out"
-                logger.info(msg)
-                self.send_notification(msg, tags=["clock", "out"])
                 ActionChains(self.driver).move_to_element(clock_out_button).click().perform()
+                # Get the latest time info for the notification
+                time_info = self.get_time_info()
+                # Send notification after successful completion
+                notification_msg = (
+                    f"Successfully clocked out\n"
+                    f"Total time worked today: {time_info.get('time_worked', 'N/A')}"
+                )
+                self.send_notification(notification_msg, tags=["clock", "out"])
+                
+            return True
 
         except Exception as e:
             error_msg = f"Error handling time tracking: {str(e)}"
             logger.error(error_msg)
-            self.send_notification(error_msg, priority="high", tags=["clock", "error"])
+            self.send_notification(error_msg, priority="high", tags=["clock", "error"], force=True)
             raise
 
     def run(self):
@@ -364,11 +388,22 @@ class TimeCheckAutomation:
         try:
             self.setup_driver()
             self.login()
-            return self.get_time_info()
+            # Store time info before sending notification
+            time_info = self.get_time_info()
+            # Only send a single notification on successful completion
+            if self.ntfy_topic:
+                status_message = (
+                    f"Status check completed successfully\n"
+                    f"Current status: {time_info['status']}\n" 
+                    f"Time worked: {time_info.get('time_worked', 'N/A')}\n"
+                    f"Time left: {time_info.get('time_left', 'N/A')}"
+                )
+                self.send_notification(status_message, tags=["time", "check"])
+            return time_info
         except Exception as e:
             error_msg = f"An error occurred: {str(e)}"
             logger.error(error_msg)
-            self.send_notification(error_msg, priority="high", tags=["time", "error"])
+            self.send_notification(error_msg, priority="high", tags=["time", "error"], force=True)
             raise
         finally:
             if self.driver:
@@ -380,12 +415,16 @@ class TimeCheckAutomation:
         try:
             self.setup_driver()
             self.login()
-            self.handle_time_tracking(action)
-            logger.info("Time tracking operation completed successfully")
+            action_performed = self.handle_time_tracking(action)
+            if action_performed:
+                logger.info("Time tracking operation completed successfully")
+                # Notification already sent by handle_time_tracking on success
+            else:
+                logger.info("No action needed")
         except Exception as e:
             error_msg = f"An error occurred: {str(e)}"
             logger.error(error_msg)
-            self.send_notification(error_msg, priority="high", tags=["clock", "error"])
+            self.send_notification(error_msg, priority="high", tags=["clock", "error"], force=True)
             raise
         finally:
             if self.driver:
@@ -499,7 +538,7 @@ def main(args=None):
         min_delay, max_delay = random_delay
         delay_secs = random.uniform(min_delay * 60, max_delay * 60)
         if not args.quiet:
-            print(f"Waiting {delay_secs/60:.2f} minutes...", file=sys.stderr)
+            logger.info(f"Waiting {delay_secs/60:.2f} minutes...")
         try:
             time.sleep(delay_secs)
         except KeyboardInterrupt:
@@ -514,11 +553,13 @@ def main(args=None):
             time_info = automation.run()
             print(json.dumps(time_info, indent=2), file=sys.stdout)
         elif args.action == 'auto-out':
-            quiet_automation = TimeCheckAutomation(quiet=True)
-            time_info = quiet_automation.run()
+            # Use the same automation instance but first check status quietly
+            time_info = automation.run()
             if time_info.get('time_left') == "00:00:00" and time_info.get('status') != "Clocked Out":
-                automation.run_clock_action("out")
-                logger.info("Auto clock-out completed successfully")
+                action_performed = automation.handle_time_tracking("out")
+                if action_performed:
+                    logger.info("Auto clock-out completed successfully")
+                    # Notification is sent by handle_time_tracking
             else:
                 logger.info("Auto-out not needed: either already clocked out or time remaining")
         else:
