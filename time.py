@@ -45,28 +45,54 @@ def setup_logging(verbosity=0):
             return True
     
     # Custom formatter that adds timezone and millisecond precision
-    class ISOFormatter(logging.Formatter):
+    class CustomFormatter(logging.Formatter):
+        def __init__(self, fmt=None, datefmt=None, style='%', validate=True):
+            super().__init__(fmt, datefmt, style, validate)
+            # Map standard logging levels to 5-character display versions
+            self.level_map = {
+                'DEBUG': 'DEBUG',
+                'INFO': 'INFO ',
+                'WARNING': 'WARN ',
+                'ERROR': 'ERROR',
+                'CRITICAL': 'CRIT '
+            }
+        
+        def format(self, record):
+            # Replace levelname with our custom mapping before formatting
+            if record.levelname in self.level_map:
+                record.levelname = self.level_map[record.levelname]
+            return super().format(record)
+        
         def formatTime(self, record, datefmt=None):
-            ct = self.converter(record.created)
+            """Format time with ISO 8601 format including timezone and milliseconds"""
             # Get timezone offset
             if time.localtime().tm_isdst:
                 tz_offset = time.altzone
             else:
                 tz_offset = time.timezone
+                
             # Convert to hours and minutes with sign
             tz_hours, tz_minutes = divmod(abs(tz_offset) // 60, 60)
             tz_sign = '+' if tz_offset <= 0 else '-'  # tz_offset is seconds west of UTC
             
             # Format time with milliseconds
+            ct = time.localtime(record.created)
             t = time.strftime('%Y-%m-%dT%H:%M:%S', ct)
             msec = int(record.msecs)
             return f"{t}.{msec:03d}{tz_sign}{tz_hours:02d}{tz_minutes:02d}"
     
     # Create custom formatter
-    formatter = ISOFormatter(log_format)
+    formatter = CustomFormatter(log_format)
     
+    # Setup root logger
     root_logger = logging.getLogger()
     root_logger.setLevel(logging.ERROR)
+    
+    # Remove any existing handlers to avoid duplicates if setup_logging is called multiple times
+    for handler in root_logger.handlers[:]:
+        root_logger.removeHandler(handler)
+    
+    # Add handler with our custom formatter
     handler = logging.StreamHandler(sys.stderr)
     handler.setFormatter(formatter)
     
@@ -76,6 +102,7 @@ def setup_logging(verbosity=0):
     
     root_logger.addHandler(handler)
 
+    # Configure specific loggers based on verbosity
     script_logger = logging.getLogger(__name__)
 
     if verbosity == 0:
