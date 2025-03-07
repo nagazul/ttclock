@@ -87,7 +87,7 @@ uv run time.py switch             # Switch in/out (quiet)
 uv run time.py -q                 # Force quiet mode (overrides -n)
 
 uv run time.py switch -r 1 5      # Random delay between 1-5 minutes before switch
-uv run time.py -r                 # Defaul random delay between 0-5 minutes
+uv run time.py -r                 # Default random delay between 0-5 minutes
 
 uv run time.py --env-file .env    # Custom .env file (also works with ttcron.sh)
 
@@ -111,11 +111,25 @@ Multiple clock in times to catch one if your laptop is down...
 Multiple clock out times to make sure you clock out when the working time is over.    
 ntfy only notifies when the status changes.  
 
-```
-15,45 06-07 * * 1-5 /home/.../ttclock/ttcron.sh -r --ntfy in        # Clock in
-10,15 13 * * 1-5 /home/.../ttclock/ttcron.sh -r out                 # nap
-25,30 14 * * 1-5 /home/.../ttclock/ttcron.sh -r in                  # nap.
-0,30 16-17 * * 1-5 /home/.../ttclock/ttcron.sh -r --ntfy auto-out   # Clock out
+### ttcron.sh Options
+
+ttcron.sh supports these additional options:
+
+- `-r`, `--random-delay`: Adds a random delay before execution
+  - `-r min max`: Random delay between min-max minutes (e.g., `-r 1 5`)
+  - `-r min`: Random delay between min and min+5 minutes
+  - `-r`: Default random delay between 0-5 minutes
+
+- `-p`, `--probability`, `--prob`: Controls probability of execution
+  - `-p 75`: 75% chance of running the command
+  - `-p` (no value): Uses a random probability between 0-100%
+
+```bash
+# Example cron entries:
+15,45 06-07 * * 1-5 /home/.../ttclock/ttcron.sh -r --ntfy in        # Clock in with random delay
+10,15 13 * * 1-5 /home/.../ttclock/ttcron.sh -p 75 out              # 75% chance to clock out at lunchtime
+25,30 14 * * 1-5 /home/.../ttclock/ttcron.sh -p -r in               # Random chance with random delay
+0,30 16-17 * * 1-5 /home/.../ttclock/ttcron.sh -r --ntfy auto-out   # Clock out with random delay
 ```
 
 ## Notes

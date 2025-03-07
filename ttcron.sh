@@ -134,20 +134,16 @@ main() {
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --probability|--prob|-p)
-                if [[ "$2" = "-1" ]]; then
-                    # Random probability between 0-100
-                    chance=$(( RANDOM % 101 ))
-                    shift 2
-                elif [[ "$2" =~ ^[0-9]+$ ]] && [ "$2" -ge 0 ] && [ "$2" -le 100 ]; then
+                if [[ "$2" =~ ^[0-9]+$ ]] && [ "$2" -ge 0 ] && [ "$2" -le 100 ]; then
                     chance="$2"
                     shift 2
                 elif [[ -z "$2" || "$2" =~ ^- ]]; then
-                    # No value provided, use default 50%
-                    chance=50
+                    # No value provided, use random probability between 0-100
+                    chance=$(( RANDOM % 101 ))
                     shift 1
                 else
                     timestamp=$(date '+%Y-%m-%dT%H:%M:%S.%3N%z')
-                    echo "[XID:$XID PID:$PROCESS_ID] $timestamp [ERROR] [$HOSTNAME] [$USERNAME] - Invalid probability value: $2. Must be -1 or 0-100." >> "$LOGFILE" 2>&1
+                    echo "[XID:$XID PID:$PROCESS_ID] $timestamp [ERROR] [$HOSTNAME] [$USERNAME] - Invalid probability value: $2. Must be 0-100." >> "$LOGFILE" 2>&1
                     exit 5
                 fi
                 ;;
