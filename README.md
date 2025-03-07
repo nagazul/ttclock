@@ -76,33 +76,45 @@ nvim .env
 ## Usage
 
 ```bash
-uv run time.py                    # Default action is 'status' (quiet)
-uv run time.py status | jq        # Check status and format JSON output
-uv run time.py status -n          # Check status with ntfy notifications
-uv run time.py in                 # Force clock-in (quiet)
-uv run time.py in -n              # Force clock-in with notifications
-uv run time.py out                # Force clock-out (quiet)
-uv run time.py auto-out           # Clock-out only if time_left is 00:00:00 
-uv run time.py switch             # Switch in/out (quiet)
+# Basic Usage
+uv run time.py                    # Check status (default action) in quiet mode
+uv run time.py status             # Explicit status check
+uv run time.py in                 # Clock in
+uv run time.py out                # Clock out
+uv run time.py switch             # Toggle current status (in->out or out->in)
+uv run time.py auto-out           # Clock out only if time_left is 00:00:00
+
+# Notification Options
+uv run time.py -n                 # Enable notifications
 uv run time.py -q                 # Force quiet mode (overrides -n)
-
-uv run time.py switch -r 1 5      # Random delay between 1-5 minutes before switch
-uv run time.py -r                 # Default random delay between 0-5 minutes
-
-uv run time.py --env-file .env    # Custom .env file (also works with ttcron.sh)
-
-# Verbosity levels (can be combined with any command):
-uv run time.py -v                 # Basic operational messages
-uv run time.py -vv                # Detailed operation messages
-uv run time.py -vvv               # Full debug output
-
-# Get the time clocked today
-uv run time.py | jq -r '.time_worked'
-
-# Notification examples:
 uv run time.py status -n          # Status check with notifications
-uv run time.py switch -n -r 1 5   # Switch with notifications and random delay
-uv run time.py -n -q              # -q overrides -n, runs in quiet mode
+uv run time.py in -n              # Clock in with notifications
+
+# Random Delay Options (-r)
+uv run time.py -r                 # Default random delay (0-5 minutes)
+uv run time.py -r 2               # Random delay between 2-7 minutes
+uv run time.py -r 1 5             # Random delay between 1-5 minutes
+uv run time.py switch -r 1 3      # Switch with 1-3 minute random delay
+
+# Probability Options (-p)
+uv run time.py -p 75              # 75% chance of executing
+uv run time.py -p                 # Random probability (0-100%)
+uv run time.py -p 50 in           # 50% chance of clocking in
+uv run time.py -p 30 -r out       # 30% chance of clocking out with random delay
+
+# Combined Examples
+uv run time.py -p 80 -r 1 3 -n in # 80% chance of clock-in with 1-3 min delay and notifications
+uv run time.py -p -r switch       # Random chance and random delay for status switch
+
+# Output Formatting
+uv run time.py | jq               # Format full JSON output
+uv run time.py | jq -r '.time_worked' # Extract only time worked today
+
+# Other Options
+uv run time.py --env-file .env    # Use custom .env file
+uv run time.py -v                 # Basic verbose logging
+uv run time.py -vv                # Detailed logging
+uv run time.py -vvv               # Full debug logging
 ```
 
 ## Cron
