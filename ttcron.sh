@@ -6,6 +6,22 @@ readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly LOGFILE="${HOME}/.log/ttcron.log"
 readonly MAX_LOG_SIZE=$((10 * 1024 * 1024))  # 10MB
 
+# Signal handler function
+handle_exit() {
+    local exit_code=$?
+    local signal=$1
+    local timestamp=$(date '+%Y-%m-%dT%H:%M:%S.%3N%z')
+    
+    # Only log if we're exiting due to a signal (not normal exit)
+    if [ -n "$signal" ]; then
+        echo "[XID:$XID PID:$PROCESS_ID] $timestamp [WARN ] [$HOSTNAME] [$USERNAME] - Received $signal signal. Script interrupted!" >> "$LOGFILE" 2>&1
+        echo "[XID:$XID PID:$PROCESS_ID] $timestamp [INFO ] [$HOSTNAME] [$USERNAME] - Completed ttcron.sh with exit code: 130 (interrupted)" >> "$LOGFILE" 2>&1
+        
+        # Force exit with appropriate code
+        exit 130
+    fi
+}
+
 # Ensure log directory exists and rotate log if needed
 prepare_logging() {
     local log_dir=$(dirname "$LOGFILE")
@@ -83,7 +99,13 @@ main() {
     readonly USERNAME=$(whoami)
     
     # Store the process ID
-    local PROCESS_ID=$$
+    readonly PROCESS_ID=$$
+    
+    # Set up signal traps for proper logging of interruptions
+    trap 'handle_exit INT' INT
+    trap 'handle_exit TERM' TERM
+    trap 'handle_exit HUP' HUP
+    trap 'handle_exit QUIT' QUIT
     
     # Generate session ID if not already set
     if [ -z "${XID:-}" ]; then
