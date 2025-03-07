@@ -139,6 +139,11 @@ def load_environment(env_file=None):
             sys.exit(1)
     load_dotenv()
 
+def check_probability(chance):
+    """Check probability and decide whether to execute based on chance percentage"""
+    roll = random.randint(1, 100)
+    return roll <= chance
+
 class TimeCheckAutomation:
     def __init__(self, quiet=True):
         self.url = os.getenv('TIMETRACKING_URL')
@@ -512,6 +517,8 @@ def parse_arguments():
                         help='Increase verbosity (can be used up to three times: -v, -vv, or -vvv)')
     parser.add_argument('-r', '--random-delay', nargs='*', default=None, metavar=('MIN', 'MAX'),
                         help='Random delay between MIN and MAX minutes before action (defaults to 0 5 if flag present with no values)')
+    parser.add_argument('-p', '--probability', '--prob', nargs='?', type=str, const='random',
+                        help='Probability of execution (0-100, or omit for random probability)')
     parser.add_argument('--env-file', type=str,
                         help='Path to custom .env file to load environment variables from')
     parser.add_argument('--action', dest='explicit_action',
@@ -521,6 +528,7 @@ def parse_arguments():
     custom_args = sys.argv[1:]
     i = 0
     delay_params = []
+    prob_params = []
     
     while i < len(custom_args):
         if custom_args[i] in ['-r', '--random-delay']:
@@ -536,6 +544,13 @@ def parse_arguments():
                             break
                     else:
                         break
+        elif custom_args[i] in ['-p', '--probability', '--prob']:
+            if i+1 < len(custom_args) and not custom_args[i+1].startswith('-') and custom_args[i+1] not in ['in', 'out', 'switch', 'status', 'auto-out']:
+                try:
+                    int(custom_args[i+1])
+                    prob_params.append(custom_args[i+1])
+                except ValueError:
+                    pass
         i += 1
     
     known_args, remaining = parser.parse_known_args()
@@ -547,7 +562,7 @@ def parse_arguments():
     for arg in remaining:
         if arg in valid_actions:
             action = arg
-        elif not (arg in delay_params):
+        elif not (arg in delay_params or arg in prob_params):
             clean_remaining.append(arg)
     
     if known_args.explicit_action:
@@ -586,6 +601,24 @@ def process_random_delay(args):
         except ValueError:
             raise argparse.ArgumentTypeError("--random-delay values must be numbers")
 
+def process_probability(args):
+    """Process probability parameter"""
+    if args.probability is None:
+        return None
+        
+    if args.probability == 'random':
+        # Generate a random probability between 0-100
+        return random.randint(0, 100)
+    else:
+        try:
+            prob = int(args.probability)
+            if 0 <= prob <= 100:
+                return prob
+            else:
+                raise argparse.ArgumentTypeError("Probability must be between 0 and 100")
+        except ValueError:
+            raise argparse.ArgumentTypeError("Probability must be a number between 0 and 100")
+
 def main(args=None):
     """Main execution function"""
     if args is None:
@@ -596,6 +629,21 @@ def main(args=None):
     logger.info(command)
     load_environment(args.env_file)
     
+    # Process probability check first
+    probability = process_probability(args)
+    if probability is not None:
+        if probability == random.randint(0, 100):
+            logger.info(f"Checking probability: {probability}% (randomly generated)")
+        else:
+            logger.info(f"Checking probability: {probability}%")
+            
+        if not check_probability(probability):
+            logger.info(f"Skipping execution based on probability ({probability}%)")
+            sys.exit(0)
+        
+        logger.info(f"Continuing execution based on probability ({probability}%)")
+    
+    # Then process random delay
     random_delay = process_random_delay(args)
     if random_delay:
         min_delay, max_delay = random_delay
