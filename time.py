@@ -90,8 +90,8 @@ def setup_logging(verbosity=0):
         logging.getLogger('WDM').setLevel(logging.ERROR)
     elif verbosity == 2:
         script_logger.setLevel(logging.DEBUG)
-        logging.getLogger('selenium').setLevel(logging.WARNING)
-        logging.getLogger('urllib3').setLevel(logging.WARNING)
+        logging.getLogger('selenium').setLevel(logging.WARN)
+        logging.getLogger('urllib3').setLevel(logging.WARN)
         logging.getLogger('WDM').setLevel(logging.INFO)
     else:
         script_logger.setLevel(logging.DEBUG)
