@@ -1,7 +1,7 @@
 [project]
-name = "time"
-version = "0.1.0"
-description = "Add your description here"
+name = "ttclock"
+version = "1.0.2"
+description = "Time Tracking Clockin Automations"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
@@ -26,6 +26,10 @@ dependencies = [
     "websocket-client==1.8.0",
     "wsproto==1.2.0",
 ]
+
+[project.scripts]
+ttclock = "ttclock.__main__:main"
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

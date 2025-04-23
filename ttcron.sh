@@ -43,7 +43,7 @@ prepare_logging() {
     return 0
 }
 
-# Execute time.py with provided arguments
+# Execute ttclock with provided arguments
 run_time() {
     local process_id=$1
     shift
@@ -53,7 +53,7 @@ run_time() {
         echo "[XID:$XID PID:$process_id] $timestamp [ERROR] [$HOSTNAME] [$USERNAME] - Failed to change to script directory: $SCRIPT_DIR" >> "$LOGFILE" 2>&1
         return 3
     }
-    
+
     # Activate virtual environment
     if [ -f .venv/bin/activate ]; then
         # shellcheck source=/dev/null
@@ -65,18 +65,28 @@ run_time() {
     else
         echo "[XID:$XID PID:$process_id] $timestamp [WARN ] [$HOSTNAME] [$USERNAME] - Virtual environment not found at expected location" >> "$LOGFILE" 2>&1
     fi
-    
+
     # Log and execute the command
-    echo "[XID:$XID PID:$process_id] $timestamp [INFO ] [$HOSTNAME] [$USERNAME] - Executing: python time.py $*" >> "$LOGFILE"
-    python time.py "$@" >> "$LOGFILE" 2>&1
-    local exit_code=$?
-    
+    # Try ttclock CLI first
+    if command -v ttclock >/dev/null 2>&1; then
+        echo "[XID:$XID PID:$process_id] $timestamp [INFO ] [$HOSTNAME] [$USERNAME] - Executing: uv run ttclock $*" >> "$LOGFILE"
+        uv run ttclock "$@" >> "$LOGFILE" 2>&1
+        local exit_code=$?
+    elif [ -f "$SCRIPT_DIR/ttclock.py" ]; then
+        echo "[XID:$XID PID:$process_id] $timestamp [INFO ] [$HOSTNAME] [$USERNAME] - Executing: uv run python ttclock.py $*" >> "$LOGFILE"
+        uv run python ttclock.py "$@" >> "$LOGFILE" 2>&1
+        local exit_code=$?
+    else
+        echo "[XID:$XID PID:$process_id] $timestamp [ERROR] [$HOSTNAME] [$USERNAME] - Neither ttclock CLI nor ttclock.py found" >> "$LOGFILE" 2>&1
+        return 1
+    fi
+
     timestamp=$(date '+%Y-%m-%dT%H:%M:%S.%3N%z')
     if [ $exit_code -ne 0 ]; then
-        echo "[XID:$XID PID:$process_id] $timestamp [ERROR] [$HOSTNAME] [$USERNAME] - time.py exited with code $exit_code" >> "$LOGFILE" 2>&1
+        echo "[XID:$XID PID:$process_id] $timestamp [ERROR] [$HOSTNAME] [$USERNAME] - Command exited with code $exit_code" >> "$LOGFILE" 2>&1
         return $exit_code
     fi
-    
+
     return 0
 }
 
@@ -221,7 +231,7 @@ main() {
         echo "[XID:$XID PID:$PROCESS_ID] $timestamp [INFO ] [$HOSTNAME] [$USERNAME] - Random delay completed" >> "$LOGFILE" 2>&1
     fi
     
-    # Execute the time.py script with remaining arguments
+    # Execute the ttclock script with remaining arguments
     run_time "$PROCESS_ID" "${cmd_args[@]}"
     local result=$?
     
