@@ -1,6 +1,6 @@
 [project]
 name = "ttclock"
-version = "1.0.2"
+version = "3.0.3"
 description = "Time Tracking Clockin Automations"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -29,6 +29,16 @@ dependencies = [
 
 [project.scripts]
 ttclock = "ttclock.__main__:main"
+
+[tool.hatch.build]
+include = [
+    "ttclock/",
+    ".env.example",
+    "README.md",
+]
+exclude = [
+    ".env",
+]
 
 [build-system]
 requires = ["hatchling"]
