@@ -72,6 +72,7 @@ uv sync
 4. Configure Environment:
 ```bash
 cp .ttclock.env.example ~/.ttclock.env
+chmod 600 ~/.ttclock.env
 nvim ~/.ttclock.env
 ```
 
