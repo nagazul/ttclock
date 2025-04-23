@@ -11,7 +11,7 @@ wheels/
 .venv
 
 # Environment variables
-.env
+.ttclock.env
 
 # uv dependencies (tracked separately)
 !uv.lock

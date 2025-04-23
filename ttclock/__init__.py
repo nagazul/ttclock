@@ -143,21 +143,41 @@ def setup_logging(verbosity=0):
 logger = logging.getLogger(__name__)
 
 def load_environment(env_file=None):
-    """Load environment variables from a custom .env file if specified, then from default .env"""
-    if env_file:
-        if os.path.exists(env_file):
-            load_dotenv(env_file, override=True)
+    """Load environment variables from ~/.ttclock.env, ./.ttclock.env, or a custom file."""
+    import os.path
+    from pathlib import Path
+
+    # Define default locations
+    home_config = Path.home() / ".ttclock.env"
+    local_config = Path.cwd() / ".ttclock.env"
+
+    # Try custom env_file first
+    if env_file and os.path.exists(env_file):
+        loaded = load_dotenv(env_file, override=True)
+        if loaded:
             logger.info(f"Loaded custom environment file: {env_file}")
         else:
-            logger.error(f"Custom environment file not found: {env_file}")
+            logger.error(f"Custom environment file not found or empty: {env_file}")
             sys.exit(1)
-    # Load default .env file (will not override existing vars unless override=True)
-    loaded_default = load_dotenv()
-    if loaded_default:
-        logger.debug("Loaded default .env file.")
+    # Then try ~/.ttclock.env
+    elif home_config.exists():
+        loaded = load_dotenv(home_config, override=True)
+        if loaded:
+            logger.info(f"Loaded environment file: {home_config}")
+        else:
+            logger.error(f"Environment file found but empty: {home_config}")
+            sys.exit(1)
+    # Then try ./.ttclock.env
+    elif local_config.exists():
+        loaded = load_dotenv(local_config, override=True)
+        if loaded:
+            logger.info(f"Loaded environment file: {local_config}")
+        else:
+            logger.error(f"Environment file found but empty: {local_config}")
+            sys.exit(1)
     else:
-        logger.debug("No default .env file found or no variables loaded from it.")
-
+        logger.error("No environment file found at ~/.ttclock.env, ./.ttclock.env, or specified via --env-file")
+        sys.exit(1)
 
 def check_probability(chance):
     """Check probability and decide whether to execute based on chance percentage"""

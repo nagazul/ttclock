@@ -5,6 +5,7 @@
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly LOGFILE="${HOME}/.log/ttcron.log"
 readonly MAX_LOG_SIZE=$((10 * 1024 * 1024))  # 10MB
+readonly DEFAULT_ENV_FILE="${HOME}/.ttclock.env"
 
 # Signal handler function
 handle_exit() {
@@ -46,17 +47,14 @@ prepare_logging() {
 # Execute ttclock with provided arguments
 run_time() {
     local process_id=$1
-    shift
+    local env_file=$2
+    shift 2
     local timestamp=$(date '+%Y-%m-%dT%H:%M:%S.%3N%z')
-    # Change to the script directory
     cd "$SCRIPT_DIR" || {
         echo "[XID:$XID PID:$process_id] $timestamp [ERROR] [$HOSTNAME] [$USERNAME] - Failed to change to script directory: $SCRIPT_DIR" >> "$LOGFILE" 2>&1
         return 3
     }
-
-    # Activate virtual environment
     if [ -f .venv/bin/activate ]; then
-        # shellcheck source=/dev/null
         source .venv/bin/activate || {
             timestamp=$(date '+%Y-%m-%dT%H:%M:%S.%3N%z')
             echo "[XID:$XID PID:$process_id] $timestamp [ERROR] [$HOSTNAME] [$USERNAME] - Failed to activate virtual environment" >> "$LOGFILE" 2>&1
@@ -65,28 +63,34 @@ run_time() {
     else
         echo "[XID:$XID PID:$process_id] $timestamp [WARN ] [$HOSTNAME] [$USERNAME] - Virtual environment not found at expected location" >> "$LOGFILE" 2>&1
     fi
-
-    # Log and execute the command
-    # Try ttclock CLI first
+    local env_arg=""
+    if [ -n "$env_file" ] && [ -f "$env_file" ]; then
+        env_arg="--env-file $env_file"
+        echo "[XID:$XID PID:$process_id] $timestamp [INFO ] [$HOSTNAME] [$USERNAME] - Using custom env file: $env_file" >> "$LOGFILE"
+    elif [ -f "$DEFAULT_ENV_FILE" ]; then
+        env_arg="--env-file $DEFAULT_ENV_FILE"
+        echo "[XID:$XID PID:$process_id] $timestamp [INFO ] [$HOSTNAME] [$USERNAME] - Using default env file: $DEFAULT_ENV_FILE" >> "$LOGFILE"
+    else
+        echo "[XID:$XID PID:$process_id] $timestamp [ERROR] [$HOSTNAME] [$USERNAME] - No .ttclock.env file found at $DEFAULT_ENV_FILE or specified path" >> "$LOGFILE" 2>&1
+        return 5
+    fi
     if command -v ttclock >/dev/null 2>&1; then
-        echo "[XID:$XID PID:$process_id] $timestamp [INFO ] [$HOSTNAME] [$USERNAME] - Executing: uv run ttclock $*" >> "$LOGFILE"
-        uv run ttclock "$@" >> "$LOGFILE" 2>&1
+        echo "[XID:$XID PID:$process_id] $timestamp [INFO ] [$HOSTNAME] [$USERNAME] - Executing: uv run ttclock $env_arg $*" >> "$LOGFILE"
+        uv run ttclock $env_arg "$@" >> "$LOGFILE" 2>&1
         local exit_code=$?
     elif [ -f "$SCRIPT_DIR/ttclock.py" ]; then
-        echo "[XID:$XID PID:$process_id] $timestamp [INFO ] [$HOSTNAME] [$USERNAME] - Executing: uv run python ttclock.py $*" >> "$LOGFILE"
-        uv run python ttclock.py "$@" >> "$LOGFILE" 2>&1
+        echo "[XID:$XID PID:$process_id] $timestamp [INFO ] [$HOSTNAME] [$USERNAME] - Executing: uv run python ttclock.py $env_arg $*" >> "$LOGFILE"
+        uv run python ttclock.py $env_arg "$@" >> "$LOGFILE" 2>&1
         local exit_code=$?
     else
         echo "[XID:$XID PID:$process_id] $timestamp [ERROR] [$HOSTNAME] [$USERNAME] - Neither ttclock CLI nor ttclock.py found" >> "$LOGFILE" 2>&1
         return 1
     fi
-
     timestamp=$(date '+%Y-%m-%dT%H:%M:%S.%3N%z')
     if [ $exit_code -ne 0 ]; then
         echo "[XID:$XID PID:$process_id] $timestamp [ERROR] [$HOSTNAME] [$USERNAME] - Command exited with code $exit_code" >> "$LOGFILE" 2>&1
         return $exit_code
     fi
-
     return 0
 }
 
