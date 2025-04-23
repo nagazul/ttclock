@@ -25,12 +25,18 @@ pip install uv || curl -LsSf https://astral.sh/uv/install.sh | sh
 
 2. Install Chrome/Chromium browser:
 ```bash
-# Ubuntu
+# Ubuntu #1
 sudo apt install wget curl
 curl -fSsL https://dl.google.com/linux/linux_signing_key.pub | sudo gpg --dearmor -o /usr/share/keyrings/google-chrome.gpg
 echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
 sudo apt update
 sudo apt install google-chrome-stable
+
+# Ubuntu #2
+sudo apt-get install -y wget unzip fonts-liberation libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libgbm1
+wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+sudo dpkg -i google-chrome-stable_current_amd64.deb
+sudo apt-get install -f -y
 
 # macOS
 brew install --cask google-chrome
@@ -55,15 +61,11 @@ cd ttclock
 
 2. Set Up the Virtual Environment:
 ```bash
-uv venv .venv
+uv venv
 ```
 
 3. Install Python Dependencies:
 ```bash
-# If using requirements.txt:
-uv pip install -r requirements.txt
-
-# Or, if using uv.lock:
 uv sync
 ```
 
