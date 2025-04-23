@@ -283,7 +283,8 @@ class TimeCheckAutomation:
                             # Use major version for WebDriver Manager
                             major_version = chrome_version.split('.')[0]
                             logger.info(f"Installing/Using ChromeDriver version compatible with Chrome major version {major_version}")
-                            service_instance = Service(ChromeDriverManager(driver_version=major_version).install())
+                            #service_instance = Service(ChromeDriverManager(driver_version=major_version).install())
+                            service_instance = Service(ChromeDriverManager(chrome_version=chrome_version).install())
                         else:
                             logger.warning(f"Could not parse Chrome version from output: '{chrome_version_output}'. Falling back to latest ChromeDriver.")
                             service_instance = Service(ChromeDriverManager().install())
