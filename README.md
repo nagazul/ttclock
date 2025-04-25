@@ -20,7 +20,7 @@ This script automates clocking in and out on a web-based time-tracking system us
 
 1. Install uv package manager (if not already installed):
 ```bash
-pip install uv || curl -LsSf https://astral.sh/uv/install.sh | sh
+curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
 2. Install Chrome/Chromium browser:
@@ -53,28 +53,37 @@ brew install jq
 
 ## Installation
 
-1. Clone the Repository:
-```bash
-git clone https://github.com/nagazul/ttclock.git
-cd ttclock
-```
+### Option 1: Local Development Setup
 
-2. Set Up the Virtual Environment:
 ```bash
-uv venv
-```
+# Clone and navigate to repository
+git clone https://github.com/nagazul/ttclock.git && cd ttclock
 
-3. Install Python Dependencies:
-```bash
-uv sync
-```
+# Create virtual environment and install dependencies
+uv venv && uv sync
 
-4. Configure Environment:
-```bash
+# Configure environment
 cp .ttclock.env.example ~/.ttclock.env
 chmod 600 ~/.ttclock.env
-nvim ~/.ttclock.env
 ```
+
+### Option 2: User-Wide Installation
+
+```bash
+# Clone and build package
+git clone https://github.com/nagazul/ttclock.git && cd ttclock
+uv build
+
+# Set up user environment and install
+cd ~ && uv venv
+uv pip install ~/ttclock/dist/ttclock-*.whl
+
+# Add to PATH
+echo 'export PATH="$HOME/.venv/bin:$PATH"' >> ~/.bash_aliases
+source ~/.bash_aliases
+```
+
+With Option 2, you can run `ttclock` commands directly from anywhere without activating the environment.
 
 ## Usage
 
