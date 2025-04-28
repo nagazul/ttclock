@@ -7,6 +7,9 @@ readonly LOGFILE="${HOME}/.log/ttcron.log"
 readonly MAX_LOG_SIZE=$((10 * 1024 * 1024))  # 10MB
 readonly DEFAULT_ENV_FILE="${HOME}/.ttclock.env"
 
+# Ensure common user bin directories are in PATH
+export PATH="$PATH:$HOME/.local/bin:/usr/local/bin"
+
 # Signal handler function
 handle_exit() {
     local exit_code=$?
@@ -44,16 +47,48 @@ prepare_logging() {
     return 0
 }
 
+# Find the uv command
+find_uv() {
+    # Try direct command
+    if command -v uv >/dev/null 2>&1; then
+        echo "uv"
+        return 0
+    fi
+    
+    # Try common locations
+    for path in "$HOME/.local/bin/uv" "/usr/local/bin/uv" "/usr/bin/uv"; do
+        if [ -x "$path" ]; then
+            echo "$path"
+            return 0
+        fi
+    done
+    
+    # Not found
+    local timestamp=$(date '+%Y-%m-%dT%H:%M:%S.%3N%z')
+    echo "[XID:$XID PID:$PROCESS_ID] $timestamp [ERROR] [$HOSTNAME] [$USERNAME] - Cannot locate uv command" >> "$LOGFILE" 2>&1
+    return 1
+}
+
 # Execute ttclock with provided arguments
 run_time() {
     local process_id=$1
     local env_file=$2
     shift 2
     local timestamp=$(date '+%Y-%m-%dT%H:%M:%S.%3N%z')
+    
+    # Find uv command
+    local UV_CMD=$(find_uv)
+    if [ $? -ne 0 ]; then
+        timestamp=$(date '+%Y-%m-%dT%H:%M:%S.%3N%z')
+        echo "[XID:$XID PID:$process_id] $timestamp [ERROR] [$HOSTNAME] [$USERNAME] - Failed to find uv command" >> "$LOGFILE" 2>&1
+        return 6
+    }
+    
     cd "$SCRIPT_DIR" || {
         echo "[XID:$XID PID:$process_id] $timestamp [ERROR] [$HOSTNAME] [$USERNAME] - Failed to change to script directory: $SCRIPT_DIR" >> "$LOGFILE" 2>&1
         return 3
     }
+    
     if [ -f .venv/bin/activate ]; then
         source .venv/bin/activate || {
             timestamp=$(date '+%Y-%m-%dT%H:%M:%S.%3N%z')
@@ -63,6 +98,7 @@ run_time() {
     else
         echo "[XID:$XID PID:$process_id] $timestamp [WARN ] [$HOSTNAME] [$USERNAME] - Virtual environment not found at expected location" >> "$LOGFILE" 2>&1
     fi
+    
     local env_arg=""
     if [ -n "$env_file" ] && [ -f "$env_file" ]; then
         env_arg="--env-file $env_file"
@@ -74,18 +110,20 @@ run_time() {
         echo "[XID:$XID PID:$process_id] $timestamp [ERROR] [$HOSTNAME] [$USERNAME] - No .ttclock.env file found at $DEFAULT_ENV_FILE or specified path" >> "$LOGFILE" 2>&1
         return 5
     fi
+    
     if command -v ttclock >/dev/null 2>&1; then
-        echo "[XID:$XID PID:$process_id] $timestamp [INFO ] [$HOSTNAME] [$USERNAME] - Executing: uv run ttclock $env_arg $*" >> "$LOGFILE"
-        uv run ttclock $env_arg "$@" >> "$LOGFILE" 2>&1
+        echo "[XID:$XID PID:$process_id] $timestamp [INFO ] [$HOSTNAME] [$USERNAME] - Executing: $UV_CMD run ttclock $env_arg $*" >> "$LOGFILE"
+        $UV_CMD run ttclock $env_arg "$@" >> "$LOGFILE" 2>&1
         local exit_code=$?
     elif [ -f "$SCRIPT_DIR/ttclock.py" ]; then
-        echo "[XID:$XID PID:$process_id] $timestamp [INFO ] [$HOSTNAME] [$USERNAME] - Executing: uv run python ttclock.py $env_arg $*" >> "$LOGFILE"
-        uv run python ttclock.py $env_arg "$@" >> "$LOGFILE" 2>&1
+        echo "[XID:$XID PID:$process_id] $timestamp [INFO ] [$HOSTNAME] [$USERNAME] - Executing: $UV_CMD run python ttclock.py $env_arg $*" >> "$LOGFILE"
+        $UV_CMD run python ttclock.py $env_arg "$@" >> "$LOGFILE" 2>&1
         local exit_code=$?
     else
         echo "[XID:$XID PID:$process_id] $timestamp [ERROR] [$HOSTNAME] [$USERNAME] - Neither ttclock CLI nor ttclock.py found" >> "$LOGFILE" 2>&1
         return 1
     fi
+    
     timestamp=$(date '+%Y-%m-%dT%H:%M:%S.%3N%z')
     if [ $exit_code -ne 0 ]; then
         echo "[XID:$XID PID:$process_id] $timestamp [ERROR] [$HOSTNAME] [$USERNAME] - Command exited with code $exit_code" >> "$LOGFILE" 2>&1
