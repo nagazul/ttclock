@@ -82,7 +82,7 @@ run_time() {
         timestamp=$(date '+%Y-%m-%dT%H:%M:%S.%3N%z')
         echo "[XID:$XID PID:$process_id] $timestamp [ERROR] [$HOSTNAME] [$USERNAME] - Failed to find uv command" >> "$LOGFILE" 2>&1
         return 6
-    }
+    fi
     
     cd "$SCRIPT_DIR" || {
         echo "[XID:$XID PID:$process_id] $timestamp [ERROR] [$HOSTNAME] [$USERNAME] - Failed to change to script directory: $SCRIPT_DIR" >> "$LOGFILE" 2>&1
