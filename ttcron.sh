@@ -87,6 +87,10 @@ run_time() {
         echo "[XID:$XID PID:$process_id] $timestamp [ERROR] [$HOSTNAME] [$USERNAME] - Failed to change to script directory: $SCRIPT_DIR" >> "$LOGFILE" 2>&1
         return 3
     }
+
+    # Ensure Playwright browsers are installed
+    echo "[XID:$XID PID:$process_id] $timestamp [INFO ] [$HOSTNAME] [$USERNAME] - Installing Playwright browsers if needed" >> "$LOGFILE"
+    $UV_CMD run playwright install >> "$LOGFILE" 2>&1
     
     if [ -f .venv/bin/activate ]; then
         source .venv/bin/activate || {
