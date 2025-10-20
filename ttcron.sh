@@ -72,8 +72,7 @@ find_uv() {
 # Execute ttclock with provided arguments
 run_time() {
     local process_id=$1
-    local env_file=$2
-    shift 2
+    shift 1
     local timestamp=$(date '+%Y-%m-%dT%H:%M:%S.%3N%z')
     
     # Find uv command
