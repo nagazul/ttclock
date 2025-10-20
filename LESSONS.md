@@ -4,8 +4,7 @@
 # Playwright Browser Cache Management
 # Uses system Chrome/Chromium if available and compatible, no download/cache
 # If system browser incompatible (e.g., old headless removed), installs bundled in ~/.cache/ms-playwright (~340MB unpacked: Chromium 164MB, Firefox 86MB, Webkit 90MB)
-# uv run may install in uv cache (~/.cache/uv/archive-v0, compressed, ~140MB)
-# Unify with PLAYWRIGHT_BROWSERS_PATH in .env or script
+# To unify with uv cache: PLAYWRIGHT_BROWSERS_PATH=/home/user/.cache/uv/archive-v0 in .env (compressed to ~140MB)
 # Prevents duplicate downloads and size issues
 
 # SSH Key Auth Issues
