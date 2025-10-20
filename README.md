@@ -1,19 +1,20 @@
 # ttclock - Time Tracking Automation
 
-This script automates clocking in and out on a web-based time-tracking system using Selenium and ntfy.sh notifications.
+This script automates clocking in and out on a web-based time-tracking system using Playwright and ntfy.sh notifications.
 
 ## Features
 
  - Automated login via environment variables
  - Handles clock-in and clock-out logic
  - Sends notifications via ntfy.sh
- - Uses Selenium WebDriver (Chrome)
+ - Uses Playwright (Chrome/Chromium)
+ - Cross-platform: Linux, macOS, Windows
 
 ## Dependencies
 
 - Google Chrome or Chromium browser
-- uv package manager
-- jq (optional, for JSON processing)
+- uv package manager (or pip)
+- jq (optional, for JSON processing on Unix-like systems)
 - ntfy.sh account (optional, for notifications)
 
 ### Installing Dependencies
@@ -40,6 +41,10 @@ sudo apt-get install -f -y
 
 # macOS
 brew install --cask google-chrome
+
+# Windows
+# Download and install Chrome from https://www.google.com/chrome/
+# Or use winget: winget install Google.Chrome
 ```
 
 3. Install jq (optional, for JSON processing):
@@ -85,6 +90,29 @@ source ~/.bash_aliases
 
 With Option 2, you can run `ttclock` commands directly from anywhere without activating the environment.
 
+### Windows Installation
+
+```powershell
+# Install uv (if not already installed)
+powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
+
+# Clone and navigate
+git clone https://github.com/nagazul/ttclock.git
+cd ttclock
+
+# Create virtual environment and install
+uv venv
+uv sync
+
+# Configure environment
+# Copy .ttclock.env.example to %USERPROFILE%\.ttclock.env and edit
+copy .ttclock.env.example %USERPROFILE%\.ttclock.env
+# Edit the file with your credentials
+notepad %USERPROFILE%\.ttclock.env
+```
+
+On Windows, run commands with `uv run ttclock` or activate the venv first.
+
 ## Usage
 
 ```bash
@@ -129,11 +157,21 @@ uv run ttclock -vv                # Detailed logging
 uv run ttclock -vvv               # Full debug logging
 ```
 
-## Cron
-ttcron.sh logs in ~/.log/ttcron.log  
+## Scheduling
+ttcron.sh logs in ~/.log/ttcron.log (Unix/Linux/macOS)  
 Multiple clock in times to catch one if your laptop is down...  
 Multiple clock out times to make sure you clock out when the working time is over.    
-ntfy only notifies when the status changes.  
+ntfy only notifies when the status changes.
+
+### Windows Scheduling
+Use Task Scheduler or create a batch file:
+
+```batch
+@echo off
+uv run ttclock in
+```
+
+Schedule with Task Scheduler for daily execution.  
 
 ### ttcron.sh Options
 
@@ -158,6 +196,7 @@ ttcron.sh supports these additional options:
 
 ## Notes
 
- - Chrome and ChromeDriver are required. The script will attempt to download ChromeDriver automatically.
- - Ensure your environment variables are set properly in the .env file.
+ - Chrome/Chromium is required. Playwright will download the browser automatically if not found.
+ - Ensure your environment variables are set properly in the .env file (%USERPROFILE%\.ttclock.env on Windows).
  - Uses ntfy.sh for notifications (optional but recommended).
+ - Tested on Linux, macOS, and Windows.
