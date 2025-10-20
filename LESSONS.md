@@ -1,11 +1,12 @@
 # Field Notes from ttclock Project
 # Tricky/non-obvious lessons, plain text format
 
-# Playwright Browser Cache Differences
-# uv run python installs in ~/.cache/ms-playwright (unpacked, ~1.1G)
-# Direct python uses uv cache (~/.cache/uv/archive-v0, compressed, ~140M)
+# Playwright Browser Cache Management
+# Uses system Chrome/Chromium if available (e.g., /usr/bin/google-chrome), no download/cache
+# If no system browser, installs in ~/.cache/ms-playwright (unpacked, ~1.1G)
+# uv run may install in uv cache (~/.cache/uv/archive-v0, compressed, ~140M)
 # Unify with PLAYWRIGHT_BROWSERS_PATH in .env or script
-# Prevents 10x size difference and duplicates
+# Prevents duplicate downloads and size issues
 
 # SSH Key Auth Issues
 # Use %n in key comments for proper formatting
