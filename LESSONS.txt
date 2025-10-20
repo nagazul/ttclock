@@ -1,63 +1,29 @@
-# Lessons Learned from ttclock Project
-# Plain text format for consistency, commands and examples directly usable
+# Field Notes from ttclock Project
+# Tricky/non-obvious lessons, plain text format
 
-# Migration from Selenium to Playwright
-# Playwright offers better performance, reliability, and cross-platform support
-# Replace webdriver with async browser context
-# Example: browser = await p.chromium.launch(); page = await browser.new_page()
+# Playwright Browser Cache Differences
+# uv run python installs in ~/.cache/ms-playwright (unpacked, ~1.1G)
+# Direct python uses uv cache (~/.cache/uv/archive-v0, compressed, ~140M)
+# Unify with PLAYWRIGHT_BROWSERS_PATH in .env or script
+# Prevents 10x size difference and duplicates
 
-# Code Modularization
-# Split large files into focused modules for maintainability
-# ttclock/__init__.py: Entry point
-# ttclock/cli.py: Argument parsing and main flow
-# ttclock/automation.py: Browser automation logic
-# ttclock/utils.py: Shared utilities (logging, notifications, etc.)
+# SSH Key Auth Issues
+# Use %n in key comments for proper formatting
+# Ensure key added to correct GitHub account (check SHA256)
+# Explicit -i may still fail if key on wrong account
 
-# Cron Scheduling with Human-like Randomness
-# Use probability (-p) and random delays (-r) to avoid predictable patterns
-# Example cron: 15,45 6-7 * * 1-5 ttcron.sh -p 60 -r 1 15 in
-# Multiple times per window for spread: 15,45 6-7 covers 6:15,6:45,7:15,7:45
+# Cron Script Argument Passing Bug
+# run_time() shifted args incorrectly, consuming command args
+# Fix: Change shift 2 to shift 1 when no env_file param
+# Caused ttclock to run without 'out' or other args
 
-# Playwright Browser Cache Management
-# Browsers installed in ~/.cache/ms-playwright or uv cache (~/.cache/uv/archive-v0)
-# To unify caches: export PLAYWRIGHT_BROWSERS_PATH=/path/to/cache
-# Add to .env: PLAYWRIGHT_BROWSERS_PATH=/home/user/.cache/uv/archive-v0
-# Prevents duplicate downloads (1.1G vs 140M compressed)
+# Playwright Migration from Selenium
+# Async context: async with playwright() as p: browser = await p.chromium.launch()
+# Better reliability, but cache management tricky
 
-# SSH Key Management for GitHub
-# Ensure correct key added to GitHub account (check SHA256 fingerprint)
-# Use ssh -i ~/.ssh/id_key -T git@github.com to test auth
-# Config ~/.ssh/config: Host github.com; User git; IdentityFile ~/.ssh/id_key
-
-# Script Debugging and Fixes
-# Check argument passing: run_time function consumed args incorrectly
-# Fix: Change shift 2 to shift 1 in run_time()
-# Add logging for troubleshooting cron jobs
-
-# Python Package Management with uv
-# uv venv: Create virtual environment
-# uv sync: Install dependencies from pyproject.toml
-# uv run: Execute commands in venv context
-# Faster than pip, handles lockfiles
-
-# Environment Variables and Configuration
-# Use .env files for sensitive data (credentials, paths)
-# Load with python-dotenv: load_dotenv()
-# Separate example file: .env.example with placeholders
-
-# Error Handling in Async Code
-# Use try/except in async functions
-# Example: async with playwright() as p: try: ... except Exception as e: print(e)
-
-# Git Workflow
-# Commit logical changes with clear messages
-# Use git status/add/commit for tracking
-# Push after local commits ready
-
-# Cross-Platform Compatibility
-# Test on Linux, macOS, Windows
-# Use pathlib for paths, os for environment
-# Handle different cache locations per OS</content>
+# Cron Human-like Scheduling
+# Multiple times + probability + random delays for spread
+# Example: 15,45 6-7 * * 1-5 ttcron.sh -p 60 -r 1 15 in</content>
 </xai:function_call />
 
 <xai:function_call name="read">
