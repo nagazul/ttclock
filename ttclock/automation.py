@@ -41,6 +41,8 @@ class TimeCheckAutomation:
 
     def setup_driver(self, max_retries=3, retry_delay=5):
         """Configure and initialize the Playwright browser with retry mechanism"""
+        # Force use of uv cache for browsers to unify and compress
+        os.environ['PLAYWRIGHT_BROWSERS_PATH'] = '/home/roc3/.cache/uv/archive-v0'
         retry_count = 0
         last_exception = None
 
