@@ -198,6 +198,6 @@ ttcron.sh supports these additional options:
 
   - Chrome/Chromium is required. Playwright will download the browser automatically if not found.
   - Ensure your environment variables are set properly in the .env file (%USERPROFILE%\.ttclock.env on Windows).
-  - To unify browser cache between ttclock and ttcron, add `PLAYWRIGHT_BROWSERS_PATH=/home/roc3/.cache/ms-playwright` to your .ttclock.env (adjust path as needed).
+  - To unify browser cache between ttclock and ttcron, add `PLAYWRIGHT_BROWSERS_PATH=/home/roc3/.cache/uv/archive-v0` to your .ttclock.env (adjust path as needed for smaller cache).
   - Uses ntfy.sh for notifications (optional but recommended).
   - Tested on Linux, macOS, and Windows.

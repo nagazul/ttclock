@@ -88,8 +88,8 @@ run_time() {
         return 3
     }
 
-    # Set browser cache to ms-playwright to unify with ttclock
-    export PLAYWRIGHT_BROWSERS_PATH="/home/roc3/.cache/ms-playwright"
+    # Set browser cache to uv's location for smaller size
+    export PLAYWRIGHT_BROWSERS_PATH="/home/roc3/.cache/uv/archive-v0"
 
     # Ensure Playwright browsers are installed
     echo "[XID:$XID PID:$process_id] $timestamp [INFO ] [$HOSTNAME] [$USERNAME] - Installing Playwright browsers if needed" >> "$LOGFILE"
