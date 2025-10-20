@@ -50,7 +50,6 @@ class TimeCheckAutomation:
                 self.playwright = sync_playwright().start()
                 self.browser = self.playwright.chromium.launch(
                     headless=True,
-                    channel="chrome",
                     args=[
                         "--disable-infobars",
                         "--no-sandbox",

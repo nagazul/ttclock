@@ -2,9 +2,9 @@
 # Tricky/non-obvious lessons, plain text format
 
 # Playwright Browser Cache Management
-# Uses system Chrome/Chromium if available (e.g., /usr/bin/google-chrome), no download/cache
-# If no system browser, installs in ~/.cache/ms-playwright (unpacked, ~1.1G)
-# uv run may install in uv cache (~/.cache/uv/archive-v0, compressed, ~140M)
+# Uses system Chrome/Chromium if available and compatible, no download/cache
+# If system browser incompatible (e.g., old headless removed), installs bundled in ~/.cache/ms-playwright (~340MB unpacked: Chromium 164MB, Firefox 86MB, Webkit 90MB)
+# uv run may install in uv cache (~/.cache/uv/archive-v0, compressed, ~140MB)
 # Unify with PLAYWRIGHT_BROWSERS_PATH in .env or script
 # Prevents duplicate downloads and size issues
 
