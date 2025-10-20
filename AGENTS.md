@@ -26,6 +26,11 @@ ls
 # Search for pattern
 grep "pattern" file.txt
 
+# Maintaining LESSONS.md
+# Document tricky/non-obvious issues during development
+# Format: # Topic\n# Description\n# Example if applicable
+# Keep only non-obvious lessons to avoid clutter
+
 # Lessons Learned from ttclock Project
 # Plain text format for consistency, commands and examples directly usable
 
