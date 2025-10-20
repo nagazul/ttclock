@@ -1,5 +1,5 @@
 #!/bin/bash
-# ttcron.sh - Time tracking automation wrapper for cron jobs
+# ttcron.sh - Time tracking automation wrapper for cron jobs (Playwright backend)
 # Usage: ttcron.sh [OPTIONS] {in|out|auto-out}
 # Configuration
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
