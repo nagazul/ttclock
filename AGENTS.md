@@ -26,6 +26,10 @@ ls
 # Search for pattern
 grep "pattern" file.txt
 
+# Maintaining STYLE.md
+# Update STYLE.md when user requests style-related changes or clarifications
+# Ensure all README files follow the updated guidelines
+
 # Maintaining LESSONS.md
 # Document tricky/non-obvious issues during development
 # Format: # Topic\n# Description\n# Example if applicable
