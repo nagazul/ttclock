@@ -2,10 +2,11 @@
 # Tricky/non-obvious lessons, plain text format
 
 # Playwright Browser Cache Management
-# Uses system Chrome/Chromium if available and compatible, no download/cache
+# Browser sources: explicit path (PLAYWRIGHT_BROWSERS_PATH), default ~/.cache/ms-playwright, or system browser if compatible
 # If system browser incompatible (e.g., old headless removed), installs bundled in ~/.cache/ms-playwright (~340MB unpacked: Chromium 164MB, Firefox 86MB, Webkit 90MB)
 # To unify with uv cache: PLAYWRIGHT_BROWSERS_PATH=/home/user/.cache/uv/archive-v0 in .env (compressed to ~140MB)
 # Prevents duplicate downloads and size issues
+# Older versions may use Selenium with system browsers or downloaded drivers (e.g., ~/.wdm for chromedriver)
 
 # SSH Key Auth Issues
 # Use %n in key comments for proper formatting
